@@ -9,8 +9,10 @@ const {
   createUser,
   findUser,
   getUsers,
+  updateAvatar,
   saveMessage,
   deleteMessage,
+  editMessage,
   getLastMessages
 } = require('./database');
 
@@ -19,6 +21,7 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_WEBSOCKET_PAYLOAD_BYTES = 10 * 1024;
 const sessions = new Map();
 const activeConnections = new Map(); // login -> { ws, userId }
+const allowedAvatars = new Set(['🙂', '😀', '😎', '🤩', '😇', '🥳', '🤔', '😴', '😡', '😭', '🐶', '🐱', '🦊', '🐼', '🐸', '🦁', '🐯', '🐨', '🐵', '🦄', '🐙', '🦋', '🌸', '🌈', '⭐', '🔥', '🍕', '🚀']);
 
 const app = express();
 app.use(express.json({ limit: '10kb' }));
@@ -56,7 +59,7 @@ app.post('/register', async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await createUser(login, passwordHash);
-    return res.status(201).json({ token: issueSession(user), login: user.login });
+    return res.status(201).json({ token: issueSession(user), login: user.login, avatar: user.avatar });
   } catch (error) {
     if (error.code === 'SQLITE_CONSTRAINT') {
       return res.status(409).json({ error: 'Такой логин уже зарегистрирован.' });
@@ -77,7 +80,7 @@ app.post('/login', async (req, res) => {
     const user = await findUser(login);
     const valid = user && await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Неверный логин или пароль.' });
-    return res.json({ token: issueSession(user), login: user.login });
+    return res.json({ token: issueSession(user), login: user.login, avatar: user.avatar });
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Ошибка сервера.' });
@@ -97,6 +100,12 @@ function send(ws, payload) {
 
 function broadcast(payload) {
   for (const connection of activeConnections.values()) send(connection.ws, payload);
+}
+
+function broadcastExcept(loginToSkip, payload) {
+  for (const [connectionLogin, connection] of activeConnections) {
+    if (connectionLogin !== loginToSkip) send(connection.ws, payload);
+  }
 }
 
 async function broadcastUsers() {
@@ -143,13 +152,21 @@ wss.on('connection', (ws) => {
     if (message.type === 'message' && typeof message.text === 'string') {
       const text = message.text.trim().slice(0, 2000);
       if (!text) return;
+      const replyToId = message.replyToId == null ? null : Number(message.replyToId);
+      if (replyToId !== null && (!Number.isInteger(replyToId) || replyToId < 1)) {
+        return send(ws, { type: 'error', error: 'Некорректное сообщение для ответа.' });
+      }
       try {
-        const saved = await saveMessage(session.userId, login, text);
+        const saved = await saveMessage(session.userId, login, text, replyToId);
         broadcast({ type: 'message', message: saved });
       } catch (error) {
         console.error('Message error:', error);
-        send(ws, { type: 'error', error: 'Не удалось сохранить сообщение.' });
+        send(ws, { type: 'error', error: error.message === 'REPLY_NOT_FOUND' ? 'Сообщение для ответа уже недоступно.' : 'Не удалось сохранить сообщение.' });
       }
+    }
+
+    if (message.type === 'typing_start' || message.type === 'typing_stop') {
+      broadcastExcept(login, { type: message.type, username: login });
     }
 
     if (message.type === 'delete_message') {
@@ -164,6 +181,36 @@ wss.on('connection', (ws) => {
       } catch (error) {
         console.error('Delete message error:', error);
         send(ws, { type: 'error', error: 'Не удалось удалить сообщение.' });
+      }
+    }
+
+    if (message.type === 'edit_message') {
+      const messageId = Number(message.messageId);
+      const text = typeof message.text === 'string' ? message.text.trim().slice(0, 2000) : '';
+      if (!Number.isInteger(messageId) || messageId < 1 || !text) {
+        return send(ws, { type: 'error', error: 'Некорректные данные для редактирования.' });
+      }
+      try {
+        const edited = await editMessage(messageId, session.userId, text);
+        if (!edited) return send(ws, { type: 'error', error: 'Сообщение не найдено или принадлежит другому пользователю.' });
+        broadcast({ type: 'message_edited', message: edited });
+      } catch (error) {
+        console.error('Edit message error:', error);
+        send(ws, { type: 'error', error: 'Не удалось изменить сообщение.' });
+      }
+    }
+
+    if (message.type === 'update_avatar') {
+      if (typeof message.avatar !== 'string' || !allowedAvatars.has(message.avatar)) {
+        return send(ws, { type: 'error', error: 'Недопустимая аватарка.' });
+      }
+      try {
+        await updateAvatar(session.userId, message.avatar);
+        await broadcastUsers();
+        broadcast({ type: 'avatar_updated', userId: session.userId, avatar: message.avatar });
+      } catch (error) {
+        console.error('Avatar update error:', error);
+        send(ws, { type: 'error', error: 'Не удалось изменить аватарку.' });
       }
     }
   });
