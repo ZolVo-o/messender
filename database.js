@@ -73,8 +73,18 @@ async function createUser(login, passwordHash) {
 
 function findUser(login) {
   return get(
-    'SELECT id, login, avatar, password_hash FROM users WHERE login = ? COLLATE NOCASE',
+    'SELECT id, login, avatar, created_at AS createdAt, password_hash FROM users WHERE login = ? COLLATE NOCASE',
     [login]
+  );
+}
+
+async function getUserProfile(userId) {
+  return get(
+    `SELECT users.id, users.login, users.avatar, users.created_at AS createdAt,
+            COUNT(messages.id) AS messageCount
+     FROM users LEFT JOIN messages ON messages.user_id = users.id
+     WHERE users.id = ? GROUP BY users.id`,
+    [userId]
   );
 }
 
@@ -145,6 +155,7 @@ module.exports = {
   initDB,
   createUser,
   findUser,
+  getUserProfile,
   getUsers,
   updateAvatar,
   saveMessage,

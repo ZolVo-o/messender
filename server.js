@@ -8,6 +8,7 @@ const {
   initDB,
   createUser,
   findUser,
+  getUserProfile,
   getUsers,
   updateAvatar,
   saveMessage,
@@ -144,6 +145,7 @@ wss.on('connection', (ws) => {
       if (oldConnection && oldConnection.ws !== ws) oldConnection.ws.close(4001, 'Новое подключение');
       activeConnections.set(login, { ws, userId: session.userId });
       send(ws, { type: 'history', messages: await getLastMessages(50) });
+      send(ws, { type: 'profile', profile: await getUserProfile(session.userId) });
       await broadcastUsers();
       broadcast({ type: 'system', text: `Пользователь ${login} вошел в чат` });
       return;
