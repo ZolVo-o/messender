@@ -1,7 +1,8 @@
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
-const db = new sqlite3.Database(path.join(__dirname, 'database.sqlite'));
+const databasePath = process.env.DATABASE_PATH || path.join(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(databasePath);
 
 function run(sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -32,6 +33,7 @@ function all(sql, params = []) {
 
 async function initDB() {
   await run('PRAGMA foreign_keys = ON');
+  await run('PRAGMA journal_mode = WAL');
   await run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

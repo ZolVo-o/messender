@@ -24,7 +24,7 @@
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
     body { min-height: 100vh; }
-    button, input { font: inherit; }
+    button, input, textarea { font: inherit; }
     button { border: 0; cursor: pointer; }
     .hidden { display: none !important; }
 
@@ -135,8 +135,11 @@
     .message-actions button:hover { background: #ffffff12; color: white; }
     .message-actions .delete-action:hover { background: #542b38; color: #ffb1b1; }
     .message:hover .message-actions, .message:focus-within .message-actions { display: flex; }
+    .message-actions:focus-within { display: flex; }
     .message-actions:hover { color: white; }
     .system { margin: 15px auto; color: #758897; font-size: 12px; text-align: center; }
+    .chat-notice { position: absolute; z-index: 3; left: 50%; bottom: 86px; max-width: min(420px, calc(100% - 32px)); transform: translateX(-50%); border: 1px solid #ffffff1c; border-radius: 10px; padding: 10px 13px; background: #2f2029; color: #ffd0d0; box-shadow: 0 10px 30px #0006; font-size: 13px; text-align: center; }
+    @media (hover: none) { .message-actions { display: flex; } }
     body.compact .message-row { margin: 0; }
     body.compact .message { padding-block: 6px; }
     .composer { display: flex; gap: 10px; padding: 14px 20px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #121c26e8; }
@@ -359,6 +362,7 @@
       <main id="messages" class="messages" aria-live="polite">
         <div id="empty-state" class="welcome"><div><div class="welcome-icon">✦</div><strong>Здесь пока тихо</strong><p>Напишите первое сообщение в общий чат</p></div></div>
       </main>
+      <div id="chat-notice" class="chat-notice hidden" role="status" aria-live="polite"></div>
       <form id="message-form" class="composer">
         <div class="emoji-wrap"><button id="emoji-button" class="emoji-button" type="button" aria-label="Открыть смайлики">☺</button><div id="emoji-picker" class="emoji-picker hidden"><div class="emoji-heading"><span>Выберите эмоцию</span><span>😊</span></div><div id="emoji-grid" class="emoji-grid"></div></div></div>
         <textarea id="message-input" placeholder="Написать сообщение..." maxlength="2000" autocomplete="off" rows="1" required></textarea>
@@ -445,6 +449,7 @@
         if (data.type === 'message_deleted') removeMessage(data.messageId);
         if (data.type === 'system' && !data.text.includes(`Пользователь ${username} вошел`) && !data.text.includes(`Пользователь ${username} покинул`)) renderSystem(data.text);
         if (data.type === 'users') { users = data.users; if (activePanel === 'people') renderPeople(); }
+        if (data.type === 'error') showChatNotice(data.error);
         if (data.type === 'auth_error') logout(data.error);
       });
       socket.addEventListener('close', () => { if (!token || intentionallyClosed) return; setConnectionStatus('нет связи · повторяем', false); clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectWebSocket, 3000); });
@@ -452,6 +457,12 @@
     function logout(reason = '') {
       intentionallyClosed = true; token = null; localStorage.removeItem('chatSession'); clearTimeout(reconnectTimer); if (socket) socket.close();
       chatScreen.style.display = 'none'; loginScreen.classList.remove('hidden'); messages.replaceChildren(emptyState); messages.classList.remove('has-messages'); if (reason) authError.textContent = reason;
+    }
+    let chatNoticeTimer = null;
+    function showChatNotice(text) {
+      const notice = document.getElementById('chat-notice');
+      notice.textContent = text; notice.classList.remove('hidden'); clearTimeout(chatNoticeTimer);
+      chatNoticeTimer = setTimeout(() => notice.classList.add('hidden'), 4000);
     }
     document.getElementById('logout-button').addEventListener('click', () => logout());
     const emojiList = ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😎', '🤩', '🤔', '😐', '😶', '🙄', '😏', '😣', '😥', '😮', '🤐', '😯', '😪', '😫', '🥱', '😴', '🤗', '🤭', '🤫', '😱', '😡', '🤬', '😢', '😭', '😤', '👍', '👎', '👏', '🙏', '❤️', '🔥', '✨', '🎉', '💯', '✅', '❌', '💬', '🙌', '🤝', '💪', '🍕', '☕', '🎁', '🌟', '🚀'];
@@ -518,7 +529,7 @@
     function renderMessage(message) {
       const wasNearBottom = loadingHistory || messages.scrollHeight - messages.scrollTop - messages.clientHeight < 120;
       emptyState.remove(); messages.classList.add('has-messages'); const mine = message.username === username; const dateLabel = formatDate(message.timestamp); if (dateLabel && dateLabel !== lastMessageDate) { const divider = document.createElement('div'); divider.className = 'date-divider'; divider.textContent = dateLabel; messages.appendChild(divider); lastMessageDate = dateLabel; lastMessageUser = ''; }
-      const grouped = lastMessageUser === message.username; const row = document.createElement('div'); row.className = 'message-row' + (mine ? ' mine' : '') + (grouped ? '' : ' group-start');
+      const grouped = lastMessageUser === message.username; const row = document.createElement('div'); row.className = 'message-row' + (mine ? ' mine' : '') + (grouped ? '' : ' group-start'); row.dataset.messageId = String(message.id); row.dataset.username = message.username; row.dataset.timestamp = message.timestamp;
       const avatar = document.createElement('div'); avatar.className = grouped ? 'avatar-spacer' : 'avatar'; avatar.textContent = grouped ? '' : initials(message.username);
       const bubble = document.createElement('article'); bubble.className = 'message';
       if (!grouped) { const sender = document.createElement('div'); sender.className = 'sender'; sender.textContent = mine ? 'Вы' : message.username; bubble.appendChild(sender); }
@@ -527,21 +538,42 @@
       if (mine) { const check = document.createElement('span'); check.className = 'message-check'; check.textContent = '✓'; time.appendChild(check); }
       const actions = document.createElement('div'); actions.className = 'message-actions';
       const copyAction = document.createElement('button'); copyAction.type = 'button'; copyAction.textContent = 'Копировать'; copyAction.addEventListener('click', async () => { try { await navigator.clipboard.writeText(message.text); copyAction.textContent = 'Скопировано'; setTimeout(() => { copyAction.textContent = 'Копировать'; }, 1200); } catch (_) {} }); actions.appendChild(copyAction);
-      if (mine) { const deleteAction = document.createElement('button'); deleteAction.className = 'delete-action'; deleteAction.type = 'button'; deleteAction.textContent = 'Удалить'; deleteAction.addEventListener('click', () => { if (window.confirm('Удалить это сообщение?')) socket?.send(JSON.stringify({ type: 'delete_message', messageId: message.id })); }); actions.appendChild(deleteAction); }
-      bubble.append(text, time, actions); row.dataset.messageId = String(message.id); row.append(avatar, bubble); messages.appendChild(row); document.getElementById('chat-preview').textContent = `${message.username}: ${message.text}`; lastMessageUser = message.username; if (wasNearBottom) messages.scrollTop = messages.scrollHeight;
+      if (mine) { const deleteAction = document.createElement('button'); deleteAction.className = 'delete-action'; deleteAction.type = 'button'; deleteAction.textContent = 'Удалить'; deleteAction.addEventListener('click', () => { if (!window.confirm('Удалить это сообщение?')) return; if (socket?.readyState !== WebSocket.OPEN) return showChatNotice('Нет подключения. Повторите попытку после восстановления связи.'); socket.send(JSON.stringify({ type: 'delete_message', messageId: message.id })); }); actions.appendChild(deleteAction); }
+      bubble.append(text, time, actions); row.append(avatar, bubble); messages.appendChild(row); updateChatPreview(); lastMessageUser = message.username; if (wasNearBottom) messages.scrollTop = messages.scrollHeight;
+    }
+    function updateChatPreview() {
+      const rows = messages.querySelectorAll('.message-row'); const last = rows[rows.length - 1];
+      document.getElementById('chat-preview').textContent = last ? `${last.dataset.username}: ${last.querySelector('.message-text')?.textContent || ''}` : 'Все сообщения группы';
+    }
+    function normalizeMessageRows() {
+      messages.querySelectorAll('.date-divider').forEach((divider) => divider.remove());
+      let previousUsername = '', previousDate = '';
+      messages.querySelectorAll('.message-row').forEach((row) => {
+        const dateLabel = formatDate(row.dataset.timestamp); const grouped = previousUsername === row.dataset.username && previousDate === dateLabel;
+        if (dateLabel && dateLabel !== previousDate) { const divider = document.createElement('div'); divider.className = 'date-divider'; divider.textContent = dateLabel; row.before(divider); }
+        row.classList.toggle('group-start', !grouped);
+        const avatar = row.firstElementChild; avatar.className = grouped ? 'avatar-spacer' : 'avatar'; avatar.textContent = grouped ? '' : initials(row.dataset.username);
+        const bubble = row.querySelector('.message'); let sender = bubble.querySelector('.sender');
+        if (grouped) sender?.remove();
+        else if (sender) sender.textContent = row.classList.contains('mine') ? 'Вы' : row.dataset.username;
+        else { sender = document.createElement('div'); sender.className = 'sender'; sender.textContent = row.classList.contains('mine') ? 'Вы' : row.dataset.username; bubble.prepend(sender); }
+        previousUsername = row.dataset.username; previousDate = dateLabel;
+      });
+      lastMessageUser = previousUsername; lastMessageDate = previousDate; updateChatPreview();
     }
     function removeMessage(messageId) {
-      const row = messages.querySelector(`[data-message-id="${CSS.escape(String(messageId))}"]`);
+      const row = Array.from(messages.querySelectorAll('.message-row')).find((item) => item.dataset.messageId === String(messageId));
       if (row) row.remove();
-      if (!messages.querySelector('.message-row')) { messages.classList.remove('has-messages'); messages.appendChild(emptyState); }
-      lastMessageUser = '';
+      const remaining = messages.querySelectorAll('.message-row');
+      if (!remaining.length) { messages.querySelectorAll('.date-divider, .system').forEach((item) => item.remove()); messages.classList.remove('has-messages'); messages.appendChild(emptyState); updateChatPreview(); }
+      else normalizeMessageRows();
     }
     function renderSystem(text) { const wasNearBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 120; emptyState.remove(); messages.classList.add('has-messages'); const item = document.createElement('div'); item.className = 'system'; item.textContent = text; messages.appendChild(item); lastMessageUser = ''; if (wasNearBottom) messages.scrollTop = messages.scrollHeight; }
     function resizeComposer() { messageInput.style.height = 'auto'; messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`; }
     messageInput.addEventListener('input', resizeComposer);
     messageInput.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); document.getElementById('message-form').requestSubmit(); } });
     document.getElementById('chat-search').addEventListener('input', (event) => filterPeople(event.target.value));
-    document.getElementById('message-form').addEventListener('submit', (event) => { event.preventDefault(); const text = messageInput.value.trim(); if (text && socket?.readyState === WebSocket.OPEN) { socket.send(JSON.stringify({ type: 'message', text })); messageInput.value = ''; messageInput.style.height = 'auto'; emojiPicker.classList.add('hidden'); messageInput.focus(); } });
+    document.getElementById('message-form').addEventListener('submit', (event) => { event.preventDefault(); const text = messageInput.value.trim(); if (!text) return; if (socket?.readyState !== WebSocket.OPEN) return showChatNotice('Нет подключения. Сообщение не отправлено.'); socket.send(JSON.stringify({ type: 'message', text })); messageInput.value = ''; messageInput.style.height = 'auto'; emojiPicker.classList.add('hidden'); messageInput.focus(); });
     try { const saved = JSON.parse(localStorage.getItem('chatSession')); if (saved?.token && saved?.username) { token = saved.token; username = saved.username; showChat(); connectWebSocket(); } } catch (_) { localStorage.removeItem('chatSession'); }
   </script>
 </body>

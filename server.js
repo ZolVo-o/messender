@@ -16,6 +16,7 @@ const {
 
 const PORT = process.env.PORT || 3000;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_WEBSOCKET_PAYLOAD_BYTES = 10 * 1024;
 const sessions = new Map();
 const activeConnections = new Map(); // login -> { ws, userId }
 
@@ -28,6 +29,9 @@ function cleanLogin(value) {
 }
 
 function issueSession(user) {
+  for (const [token, session] of sessions) {
+    if (session.expiresAt < Date.now()) sessions.delete(token);
+  }
   const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, {
     userId: user.id,
@@ -65,8 +69,8 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
   const login = cleanLogin(req.body.login);
   const password = req.body.password;
-  if (!login || typeof password !== 'string') {
-    return res.status(400).json({ error: 'Введите логин и пароль.' });
+  if (!validateCredentials(login, password)) {
+    return res.status(400).json({ error: 'Логин: 2–32 символа, пароль: 4–128 символов.' });
   }
 
   try {
@@ -81,7 +85,11 @@ app.post('/login', async (req, res) => {
 });
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: MAX_WEBSOCKET_PAYLOAD_BYTES });
+
+wss.on('error', (error) => {
+  console.error('WebSocket server error:', error.message);
+});
 
 function send(ws, payload) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
@@ -106,9 +114,13 @@ wss.on('connection', (ws) => {
 
   send(ws, { type: 'connected' });
 
-  ws.on('message', async (raw) => {
+  ws.on('message', async (raw, isBinary) => {
     let message;
+    if (isBinary) return send(ws, { type: 'error', error: 'Поддерживаются только текстовые сообщения.' });
     try { message = JSON.parse(raw.toString()); } catch (_) { return send(ws, { type: 'error', error: 'Некорректный формат данных.' }); }
+    if (!message || typeof message !== 'object' || Array.isArray(message)) {
+      return send(ws, { type: 'error', error: 'Некорректный формат данных.' });
+    }
 
     if (!session) {
       if (message.type !== 'auth' || typeof message.token !== 'string') {
@@ -163,6 +175,19 @@ wss.on('connection', (ws) => {
       broadcast({ type: 'system', text: `Пользователь ${login} покинул чат` });
     }
   });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket connection error:', error.message);
+  });
+});
+
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Порт ${PORT} уже занят. Остановите другой сервер или запустите приложение с PORT=3001 npm start.`);
+  } else {
+    console.error('Server error:', error);
+  }
+  process.exitCode = 1;
 });
 
 initDB()

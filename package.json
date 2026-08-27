@@ -7,14 +7,17 @@
   "scripts": {
     "start": "node server.js"
   },
+  "engines": {
+    "node": ">=20.17.0"
+  },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "express": "^4.21.2",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^6.0.1",
     "ws": "^8.18.0"
   },
   "allowScripts": {
-    "bcrypt@5.1.1": true,
-    "sqlite3@5.1.7": true
+    "sqlite3@6.0.1": true,
+    "bcrypt@6.0.0": true
   }
 }
