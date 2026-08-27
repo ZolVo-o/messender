@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#101822">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Круг">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-192.svg">
   <title>Круг — общий чат</title>
   <style>
     :root {
@@ -894,6 +901,7 @@
     messageInput.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); document.getElementById('message-form').requestSubmit(); } });
     document.getElementById('chat-search').addEventListener('input', (event) => filterPeople(event.target.value));
     document.getElementById('message-form').addEventListener('submit', (event) => { event.preventDefault(); const text = messageInput.value.trim(); if (!text) return; if (socket?.readyState !== WebSocket.OPEN) return showChatNotice('Нет подключения. Сообщение не отправлено.'); clearTimeout(typingTimer); socket.send(JSON.stringify({ type: 'typing_stop' })); socket.send(JSON.stringify(editingMessageId ? { type: 'edit_message', messageId: editingMessageId, text } : { type: 'message', text, replyToId: replyTo?.id || null })); editingMessageId = null; cancelReply(); messageInput.value = ''; messageInput.placeholder = 'Написать сообщение...'; messageInput.style.height = 'auto'; emojiPicker.classList.add('hidden'); messageInput.focus(); });
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));
     try { const saved = JSON.parse(localStorage.getItem('chatSession')); if (saved?.token && saved?.username) { token = saved.token; username = saved.username; avatar = saved.avatar || '🙂'; showChat(); connectWebSocket(); } } catch (_) { localStorage.removeItem('chatSession'); }
   </script>
 </body>
