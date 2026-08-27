@@ -403,6 +403,7 @@
     /* Phone-first: телефон — основной сценарий, desktop подключается отдельно */
     html, body { width: 100%; min-width: 0; overflow-x: hidden; }
     body { min-height: 100dvh; }
+    .chat-screen { min-height: var(--app-height, 100dvh); }
     .auth-screen { min-height: 100dvh; align-items: start; padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); overflow-y: auto; }
     .auth-layout { display: block; width: min(100%, 430px); margin: auto; }
     .brand-block { padding: 8px 4px 22px; text-align: center; }
@@ -412,11 +413,11 @@
     .brand-block p { font-size: 15px; }
     .auth-card { padding: 22px 18px; }
     .auth-tab, .primary-button, .auth-switch button, .password-toggle { min-height: 44px; }
-    .app-shell { width: 100%; height: 100dvh; margin: 0; border: 0; border-radius: 0; }
+    .app-shell { width: 100%; height: var(--app-height, 100dvh); margin: 0; border: 0; border-radius: 0; }
     .app-rail { display: none; }
     .sidebar { position: absolute; z-index: 4; top: 0; bottom: 0; left: 0; width: min(310px, calc(100vw - 36px)); max-width: 88vw; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); transform: translateX(-100%); transition: transform .25s; box-shadow: 15px 0 40px #0007; }
     .sidebar.open { transform: translateX(0); }
-    .chat { width: 100%; height: 100dvh; min-width: 0; }
+    .chat { width: 100%; height: var(--app-height, 100dvh); min-width: 0; }
     .menu-button { display: block; min-width: 44px; min-height: 44px; }
     .chat-header { min-height: 64px; padding: max(10px, env(safe-area-inset-top)) max(9px, env(safe-area-inset-right)) 10px max(9px, env(safe-area-inset-left)); gap: 8px; }
     .chat-logo { width: 36px; height: 36px; }
@@ -449,7 +450,7 @@
       .auth-screen { padding-block: 10px; }
       .brand-block { display: none; }
       .auth-layout { width: min(100%, 430px); }
-      .app-shell, .chat { height: 100dvh; }
+      .app-shell, .chat { height: var(--app-height, 100dvh); }
       .chat-header { min-height: 52px; padding-block: 4px; }
       .messages { padding-block: 7px; }
       .composer { padding-block: 4px; }
@@ -572,9 +573,18 @@
     const messages = document.getElementById('messages');
     const emptyState = document.getElementById('empty-state');
     const messageInput = document.getElementById('message-input');
-    let token = null, username = '', avatar = '🙂', profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, intentionallyClosed = false, authMode = 'login', users = [], activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null;
+    let token = null, username = '', avatar = '🙂', profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, reconnectDelay = 1000, intentionallyClosed = false, authMode = 'login', users = [], activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null;
     const typingUsers = new Set();
     const notificationsEnabled = () => localStorage.getItem('chatNotifications') === 'true';
+    function updateViewportHeight() {
+      const height = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+    }
+    updateViewportHeight();
+    window.addEventListener('resize', updateViewportHeight);
+    window.visualViewport?.addEventListener('resize', updateViewportHeight);
+    window.addEventListener('online', () => { if (!token || intentionallyClosed) return; clearTimeout(reconnectTimer); reconnectDelay = 1000; connectWebSocket(); });
+    window.addEventListener('offline', () => { if (token) setConnectionStatus('нет интернета', false); });
     function updateUnreadCount() {
       const badge = document.getElementById('unread-count');
       badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
@@ -594,7 +604,7 @@
       document.getElementById('current-user').textContent = username;
       document.getElementById('sidebar-name').textContent = username;
       document.getElementById('sidebar-avatar').textContent = avatar;
-      loginScreen.classList.add('hidden'); chatScreen.style.display = 'flex'; messageInput.focus();
+      loginScreen.classList.add('hidden'); chatScreen.style.display = 'flex';
     }
     function setConnectionStatus(text, online) {
       document.getElementById('connection-status').textContent = text;
@@ -642,11 +652,11 @@
     document.getElementById('confirm-toggle').addEventListener('click', (event) => togglePassword('confirm-password', event.currentTarget));
     setAuthMode('login');
     function connectWebSocket() {
-      if (!token || intentionallyClosed) return; setConnectionStatus('подключение...', false);
+      if (!token || intentionallyClosed || (socket && [WebSocket.CONNECTING, WebSocket.OPEN].includes(socket.readyState))) return; setConnectionStatus('подключение...', false);
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'; socket = new WebSocket(`${protocol}//${location.host}/ws`);
-      socket.addEventListener('open', () => { setConnectionStatus('онлайн', true); socket.send(JSON.stringify({ type: 'auth', token })); });
+      socket.addEventListener('open', () => { reconnectDelay = 1000; setConnectionStatus('онлайн', true); socket.send(JSON.stringify({ type: 'auth', token })); });
       socket.addEventListener('message', (event) => {
-        const data = JSON.parse(event.data);
+        let data; try { data = JSON.parse(event.data); } catch (_) { return showChatNotice('Получены повреждённые данные.'); }
         if (data.type === 'history') { clearSelection(); typingUsers.clear(); renderTypingIndicator(); loadingHistory = true; messages.replaceChildren(); messages.classList.remove('has-messages'); lastMessageUser = ''; lastMessageDate = ''; data.messages.forEach(renderMessage); loadingHistory = false; messages.scrollTop = messages.scrollHeight; if (!data.messages.length) messages.appendChild(emptyState); }
         if (data.type === 'profile') { profile = data.profile || profile; if (activePanel === 'profile') renderProfilePanel(); }
         if (data.type === 'message') { renderMessage(data.message); notifyAboutMessage(data.message); }
@@ -660,7 +670,7 @@
         if (data.type === 'error') showChatNotice(data.error);
         if (data.type === 'auth_error') logout(data.error);
       });
-      socket.addEventListener('close', () => { if (!token || intentionallyClosed) return; setConnectionStatus('нет связи · повторяем', false); clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectWebSocket, 3000); });
+      socket.addEventListener('close', () => { if (!token || intentionallyClosed) return; setConnectionStatus(navigator.onLine === false ? 'нет интернета' : 'нет связи · повторяем', false); clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectWebSocket, reconnectDelay); reconnectDelay = Math.min(reconnectDelay * 2, 30000); });
     }
     function logout(reason = '') {
       intentionallyClosed = true; token = null; localStorage.removeItem('chatSession'); clearTimeout(reconnectTimer); if (socket) socket.close();
@@ -766,6 +776,9 @@
     function clearSelection() {
       selectedRow?.classList.remove('selected'); selectedRow = null;
       document.getElementById('selection-toolbar').classList.remove('open');
+      document.getElementById('selection-label').textContent = 'Сообщение выбрано';
+      document.getElementById('edit-selected').classList.remove('hidden');
+      document.getElementById('delete-selected').classList.remove('hidden');
     }
     function selectMessage(row) {
       selectedRow?.classList.remove('selected'); selectedRow = row; row.classList.add('selected');
