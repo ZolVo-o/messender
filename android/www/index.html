@@ -1261,17 +1261,36 @@
     messageInput.addEventListener('blur', () => { clearTimeout(typingTimer); if (socket?.readyState === WebSocket.OPEN && currentDialog) socket.send(JSON.stringify({ type: 'typing_stop', dialogId: currentDialog.id })); });
     messageInput.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); document.getElementById('message-form').requestSubmit(); } });
     function updateRecordingStatus() { const status = document.getElementById('recording-status'); if (!mediaRecorder) { status.classList.remove('visible'); return; } const seconds = Math.min(30, Math.floor((Date.now() - recordingStartedAt) / 1000)); status.textContent = recordingCancelled ? 'Отпустите для отмены' : `● ${String(seconds).padStart(2, '0')} с · сдвиньте влево для отмены`; status.classList.add('visible'); }
+    async function getMicrophoneStream(constraints = true) {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
+      if (hasNativeMicrophonePermissionBridge() && !window.KrugAndroid.isMicrophoneGranted?.()) {
+        const permissionState = await new Promise((resolve) => {
+          const timeout = setTimeout(() => resolve('timeout'), 15000);
+          window.addEventListener('krugmicrophonepermission', (event) => { clearTimeout(timeout); resolve(event.detail?.state || 'denied'); }, { once: true });
+          window.KrugAndroid.requestMicrophone();
+        });
+        if (permissionState !== 'granted') throw new Error(permissionState === 'settings' ? 'settings' : 'denied');
+      }
+      return navigator.mediaDevices.getUserMedia({ audio: constraints });
+    }
+    function microphoneErrorMessage(error) {
+      if (error?.message === 'unsupported') return 'Этот браузер не поддерживает запись аудио.';
+      if (error?.message === 'settings') return 'Откройте настройки Android и включите микрофон для приложения.';
+      if (error?.name === 'NotAllowedError' || error?.message === 'denied') return 'Нет доступа к микрофону. Разрешите запись в приложении или браузере.';
+      if (error?.name === 'NotFoundError') return 'Микрофон не найден. Подключите его и повторите попытку.';
+      return 'Не удалось подключить микрофон. Проверьте разрешение и повторите попытку.';
+    }
     async function startRecording(event) {
-      if (mediaRecorder || recordingRequested) return; if (!currentDialog) return showChatNotice('Сначала выберите диалог.'); if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return showChatNotice('Этот браузер не поддерживает запись аудио.');
+      if (mediaRecorder || recordingRequested) return; if (!currentDialog) return showChatNotice('Сначала выберите диалог.'); if (!window.MediaRecorder) return showChatNotice('Этот браузер не поддерживает запись аудио.');
       recordingRequested = true; recordingCancelled = false; recordingPointerId = event.pointerId; recordingStartX = event.clientX || 0;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await getMicrophoneStream(true);
         if (!recordingRequested) { stream.getTracks().forEach((track) => track.stop()); return; }
         const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported(type));
         mediaRecorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined); recordingChunks = []; recordingStartedAt = Date.now(); mediaRecorder.addEventListener('dataavailable', (item) => { if (item.data.size) recordingChunks.push(item.data); });
         mediaRecorder.addEventListener('stop', async () => { const recorder = mediaRecorder; const dialogId = currentDialog?.id; const duration = Math.min(30, Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))); const mimeType = recorder?.mimeType?.split(';')[0] || preferred?.split(';')[0] || 'audio/webm'; const blob = new Blob(recordingChunks, { type: mimeType }); stream.getTracks().forEach((track) => track.stop()); mediaRecorder = null; recordingRequested = false; recordingPointerId = null; clearTimeout(recordingStopTimer); clearInterval(recordingTimer); document.getElementById('record-button').classList.remove('recording'); document.getElementById('record-button').textContent = '●'; document.getElementById('recording-status').classList.remove('visible'); if (!recordingCancelled && dialogId && blob.size >= 256) await uploadAudio(blob, duration, dialogId); else if (!recordingCancelled) showChatNotice('Запись получилась слишком короткой.'); });
         mediaRecorder.start(250); const button = document.getElementById('record-button'); button.classList.add('recording'); button.textContent = '■'; updateRecordingStatus(); recordingTimer = setInterval(updateRecordingStatus, 250); recordingStopTimer = setTimeout(() => stopRecording(false), 30000);
-      } catch (_) { recordingRequested = false; recordingPointerId = null; showChatNotice('Нет доступа к микрофону. Разрешите запись в приложении.'); }
+      } catch (error) { recordingRequested = false; recordingPointerId = null; showChatNotice(microphoneErrorMessage(error)); }
     }
     function stopRecording(cancelled) { if (!mediaRecorder) { recordingRequested = false; return; } recordingCancelled ||= cancelled; if (mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
     function handleRecordingMove(event) { if (!mediaRecorder || event.pointerId !== recordingPointerId) return; recordingCancelled = (recordingStartX - event.clientX) > 80; updateRecordingStatus(); }
@@ -1286,7 +1305,7 @@
       const response = await fetch(serverEndpoint('/api/call-config'), { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error('config');
       const data = await response.json();
-      callConfig = { iceServers: Array.isArray(data.iceServers) ? data.iceServers : [] };
+      callConfig = { iceServers: Array.isArray(data.iceServers) && data.iceServers.length ? data.iceServers : [{ urls: 'stun:stun.l.google.com:19302' }] };
       return callConfig;
     }
     function setCallStatus(text) { document.getElementById('call-status').textContent = text; }
@@ -1302,14 +1321,14 @@
     async function applyCallAnswer(answer) { if (!callPeer || !answer?.sdp) return; try { await callPeer.setRemoteDescription(answer); await Promise.all(pendingIceCandidates.splice(0).map((candidate) => callPeer.addIceCandidate(candidate).catch(() => {}))); setCallStatus('Соединение...'); } catch (_) { setCallStatus('Ошибка соединения'); setTimeout(() => endCall(true), 700); } }
     async function startCall() {
       if (!currentDialog || socket?.readyState !== WebSocket.OPEN) return showChatNotice('Сначала выберите диалог.');
-      try { callDialogId = currentDialog.id; pendingIceCandidates = []; showCallScreen(currentDialog, 'Вызов...'); callStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); const offer = await callPeer.createOffer(); await callPeer.setLocalDescription(offer); socket.send(JSON.stringify({ type: 'call_offer', dialogId: callDialogId, offer: callPeer.localDescription })); document.getElementById('call-button').classList.add('active'); } catch (_) { endCall(false); showChatNotice('Не удалось начать аудиозвонок. Проверьте доступ к микрофону.'); }
+      try { callDialogId = currentDialog.id; pendingIceCandidates = []; showCallScreen(currentDialog, 'Подключаем микрофон...'); callStream = await getMicrophoneStream({ echoCancellation: true, noiseSuppression: true, autoGainControl: true }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); const offer = await callPeer.createOffer(); await callPeer.setLocalDescription(offer); socket.send(JSON.stringify({ type: 'call_offer', dialogId: callDialogId, offer: callPeer.localDescription })); setCallStatus('Вызов...'); document.getElementById('call-button').classList.add('active'); } catch (error) { endCall(false); showChatNotice(error?.message === 'config' ? 'Не удалось получить настройки соединения. Повторите попытку.' : microphoneErrorMessage(error)); }
     }
     async function receiveCall(data) {
       const dialog = dialogs.find((item) => item.id === data.dialogId) || (currentDialog?.id === data.dialogId ? currentDialog : null);
       if (!dialog || callPeer || pendingCall) return socket?.send(JSON.stringify({ type: 'call_reject', dialogId: data.dialogId }));
       pendingIceCandidates = []; pendingCall = data; showCallScreen(dialog, 'Входящий вызов', true);
     }
-    async function acceptCall() { if (!pendingCall) return; const data = pendingCall; pendingCall = null; document.getElementById('call-accept').classList.add('hidden'); document.getElementById('call-mute').classList.remove('hidden'); try { callDialogId = data.dialogId; callStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); await callPeer.setRemoteDescription(data.offer); await Promise.all(pendingIceCandidates.splice(0).map((candidate) => callPeer.addIceCandidate(candidate).catch(() => {}))); const answer = await callPeer.createAnswer(); await callPeer.setLocalDescription(answer); socket.send(JSON.stringify({ type: 'call_answer', dialogId: callDialogId, answer: callPeer.localDescription })); setCallStatus('Соединение...'); document.getElementById('call-button').classList.add('active'); } catch (_) { endCall(true, data.dialogId, 'call_reject'); } }
+    async function acceptCall() { if (!pendingCall) return; const data = pendingCall; pendingCall = null; document.getElementById('call-accept').classList.add('hidden'); document.getElementById('call-mute').classList.remove('hidden'); try { callDialogId = data.dialogId; setCallStatus('Подключаем микрофон...'); callStream = await getMicrophoneStream({ echoCancellation: true, noiseSuppression: true, autoGainControl: true }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); await callPeer.setRemoteDescription(data.offer); await Promise.all(pendingIceCandidates.splice(0).map((candidate) => callPeer.addIceCandidate(candidate).catch(() => {}))); const answer = await callPeer.createAnswer(); await callPeer.setLocalDescription(answer); socket.send(JSON.stringify({ type: 'call_answer', dialogId: callDialogId, answer: callPeer.localDescription })); setCallStatus('Соединение...'); document.getElementById('call-button').classList.add('active'); } catch (error) { endCall(true, data.dialogId, 'call_reject'); showChatNotice(microphoneErrorMessage(error)); } }
     function endCall(notify = true, dialogId = callDialogId, signal = 'call_end') { if (notify && dialogId && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: signal, dialogId })); clearTimeout(callTimeout); pendingCall = null; pendingIceCandidates = []; callPeer?.close(); callPeer = null; callStream?.getTracks().forEach((track) => track.stop()); callStream = null; callDialogId = null; callMuted = false; document.querySelectorAll('audio[data-call-audio]').forEach((audio) => audio.remove()); document.getElementById('call-button').classList.remove('active'); document.getElementById('call-screen').classList.add('hidden'); }
     document.getElementById('call-button').addEventListener('click', () => callPeer ? endCall() : startCall());
     document.getElementById('call-screen-close').addEventListener('click', () => endCall());

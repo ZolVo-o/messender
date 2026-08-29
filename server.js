@@ -61,6 +61,20 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/api/call-config', (req, res) => {
+  if (!getSessionFromRequest(req)) return res.status(401).json({ error: 'Требуется авторизация.' });
+
+  const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+  const turnUrl = process.env.TURN_URL;
+  const turnUsername = process.env.TURN_USERNAME;
+  const turnCredential = process.env.TURN_CREDENTIAL;
+  if (turnUrl && turnUsername && turnCredential) {
+    iceServers.push({ urls: turnUrl, username: turnUsername, credential: turnCredential });
+  }
+
+  return res.json({ iceServers });
+});
+
 app.post('/api/dialogs/:dialogId/audio', express.raw({ type: () => true, limit: MAX_AUDIO_BYTES }), async (req, res) => {
   const session = getSessionFromRequest(req);
   const dialogId = Number(req.params.dialogId);
