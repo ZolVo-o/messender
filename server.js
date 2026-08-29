@@ -42,6 +42,15 @@ fs.mkdirSync(audioDirectory, { recursive: true });
 const app = express();
 app.disable('x-powered-by');
 app.use((req, res, next) => {
+  if (req.get('origin') === 'https://appassets.androidplatform.net') {
+    res.set({
+      'Access-Control-Allow-Origin': 'https://appassets.androidplatform.net',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Audio-Duration',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      Vary: 'Origin'
+    });
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
   res.set({
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'same-origin',

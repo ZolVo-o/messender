@@ -1,4 +1,7 @@
 node_modules/
+android/node_modules/
+android/dist/
+android/.tools/
 database.sqlite
 database.sqlite-*
 uploads/audio/

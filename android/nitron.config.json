@@ -1,0 +1,18 @@
+{
+  "name": "Круг",
+  "packageId": "ru.zolvo.krug",
+  "version": "1.0.0",
+  "entry": "www/index.html",
+  "orientation": "portrait",
+  "permissions": ["INTERNET", "ACCESS_NETWORK_STATE", "RECORD_AUDIO", "POST_NOTIFICATIONS"],
+  "network": {
+    "cleartext": false
+  },
+  "webview": {
+    "backButton": "history",
+    "clearCacheOnStart": false
+  },
+  "splashScreen": {
+    "backgroundColor": "#080d14"
+  }
+}
