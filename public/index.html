@@ -815,17 +815,42 @@
       button, input, textarea, audio { touch-action: manipulation; }
       input, textarea, select { font-size: max(16px, 1em); }
     }
+
+    /* Компактная и понятная форма входа и регистрации. */
+    .auth-card { position: relative; overflow: hidden; }
+    .auth-card::before { content: ''; position: absolute; width: 180px; height: 180px; top: -115px; right: -92px; border: 1px solid #79bfff2e; border-radius: 50%; box-shadow: 0 0 0 20px #79bfff08, 0 0 0 42px #79bfff06; pointer-events: none; }
+    .auth-kicker { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: #8bc9ff; font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .auth-kicker::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #62d29a; box-shadow: 0 0 0 4px #62d29a18; }
+    .auth-card h2 { position: relative; margin-bottom: 8px; font-size: 27px; letter-spacing: -.7px; }
+    .auth-card .subtitle { position: relative; max-width: 290px; margin-bottom: 22px; line-height: 1.5; }
+    .auth-tabs { position: relative; margin-bottom: 24px; padding: 5px; border-radius: 14px; }
+    .auth-tab { min-height: 42px; border-radius: 10px; }
+    .auth-form-fields { display: grid; gap: 14px; }
+    .auth-form-fields .field { margin: 0; }
+    .field span { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: #c1d0dc; }
+    .field .field-hint { color: #718799; font-size: 11px; font-weight: 500; }
+    .field input { min-height: 50px; padding-inline: 15px; border-radius: 13px; }
+    .field input::placeholder { color: #667c8e; }
+    .password-wrap input { padding-right: 86px; }
+    .password-toggle { right: 9px; padding: 7px 8px; border-radius: 8px; color: #9fbed5; font-weight: 650; }
+    .auth-error:not(:empty) { margin: 14px 0 0; border: 1px solid #ef838344; border-radius: 10px; padding: 9px 11px; background: #6a263326; }
+    .auth-submit { min-height: 52px; margin-top: 18px; border-radius: 13px; letter-spacing: .01em; }
+    .auth-switch { margin-top: 16px; }
+    .auth-privacy { margin: 18px 0 0; color: #687f91; font-size: 11px; line-height: 1.5; text-align: center; }
+    .auth-screen[data-auth-mode="register"] .auth-card { border-color: #4f9cf54d; }
+    @media (max-width: 380px) { .auth-kicker { margin-bottom: 9px; } .auth-card h2 { font-size: 24px; } .auth-form-fields { gap: 11px; } .field input { min-height: 47px; } }
   </style>
 </head>
 <body>
   <section id="login-screen" class="auth-screen">
     <div class="auth-layout">
       <div class="brand-block">
-        <div class="brand-mark">↗</div>
+        <div class="brand-mark" aria-hidden="true">К</div>
         <h1>Разговоры, которые всегда рядом.</h1>
         <p>Личные сообщения, контакты и звонки в одном спокойном пространстве.</p>
       </div>
       <div class="auth-card">
+        <p class="auth-kicker">Круг · личное пространство</p>
         <h2 id="auth-title">Вход в чат</h2>
         <p id="auth-subtitle" class="subtitle">Введите свои данные, чтобы продолжить</p>
         <div class="auth-tabs" role="tablist" aria-label="Авторизация">
@@ -833,12 +858,15 @@
           <button id="register-tab" class="auth-tab" type="button" role="tab" aria-selected="false">Регистрация</button>
         </div>
         <form id="auth-form">
-          <label class="field"><span>Как вас зовут?</span><input id="login" placeholder="Придумайте имя" autocomplete="username" minlength="2" maxlength="32" required></label>
-          <label class="field"><span>Пароль</span><div class="password-wrap"><input id="password" type="password" placeholder="Не менее 4 символов" autocomplete="current-password" minlength="4" maxlength="128" required><button id="password-toggle" class="password-toggle" type="button">Показать</button></div></label>
-          <label id="confirm-field" class="field hidden"><span>Повторите пароль</span><div class="password-wrap"><input id="confirm-password" type="password" placeholder="Введите пароль ещё раз" autocomplete="new-password" minlength="4" maxlength="128"><button id="confirm-toggle" class="password-toggle" type="button">Показать</button></div></label>
+          <div class="auth-form-fields">
+            <label class="field"><span><span id="login-label">Имя пользователя</span><small id="login-hint" class="field-hint">Ваше имя в чате</small></span><input id="login" placeholder="Введите имя пользователя" autocomplete="username" minlength="2" maxlength="32" required></label>
+            <label class="field"><span><span>Пароль</span><small class="field-hint">Не менее 4 символов</small></span><div class="password-wrap"><input id="password" type="password" placeholder="Введите пароль" autocomplete="current-password" minlength="4" maxlength="128" required><button id="password-toggle" class="password-toggle" type="button">Показать</button></div></label>
+            <label id="confirm-field" class="field hidden"><span><span>Подтвердите пароль</span><small class="field-hint">Повторите пароль</small></span><div class="password-wrap"><input id="confirm-password" type="password" placeholder="Введите пароль ещё раз" autocomplete="new-password" minlength="4" maxlength="128"><button id="confirm-toggle" class="password-toggle" type="button">Показать</button></div></label>
+          </div>
           <div id="auth-error" class="auth-error" role="alert"></div>
-          <button class="primary-button" type="submit" data-action="login">Войти</button>
+          <button class="primary-button auth-submit" type="submit" data-action="login">Войти</button>
           <p id="auth-switch" class="auth-switch">Нет аккаунта? <button type="button">Зарегистрироваться</button></p>
+          <p class="auth-privacy">Продолжая, вы соглашаетесь бережно общаться с другими участниками.</p>
         </form>
       </div>
     </div>
@@ -959,9 +987,11 @@
     function setAuthMode(mode) {
       authMode = mode;
       const registration = mode === 'register';
+      loginScreen.dataset.authMode = mode;
       document.getElementById('auth-title').textContent = registration ? 'Создание аккаунта' : 'Вход в чат';
       document.getElementById('auth-subtitle').textContent = registration ? 'Это займёт всего несколько секунд' : 'Введите свои данные, чтобы продолжить';
       document.getElementById('login-label').textContent = registration ? 'Придумайте имя пользователя' : 'Имя пользователя';
+      document.getElementById('login-hint').textContent = registration ? 'От 2 до 32 символов' : 'Ваше имя в чате';
       document.getElementById('login').placeholder = registration ? 'От 2 до 32 символов' : 'Введите имя пользователя';
       document.getElementById('login-tab').classList.toggle('active', !registration);
       document.getElementById('register-tab').classList.toggle('active', registration);
