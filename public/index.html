@@ -961,6 +961,8 @@
       const registration = mode === 'register';
       document.getElementById('auth-title').textContent = registration ? 'Создание аккаунта' : 'Вход в чат';
       document.getElementById('auth-subtitle').textContent = registration ? 'Это займёт всего несколько секунд' : 'Введите свои данные, чтобы продолжить';
+      document.getElementById('login-label').textContent = registration ? 'Придумайте имя пользователя' : 'Имя пользователя';
+      document.getElementById('login').placeholder = registration ? 'От 2 до 32 символов' : 'Введите имя пользователя';
       document.getElementById('login-tab').classList.toggle('active', !registration);
       document.getElementById('register-tab').classList.toggle('active', registration);
       document.getElementById('login-tab').setAttribute('aria-selected', String(!registration));
