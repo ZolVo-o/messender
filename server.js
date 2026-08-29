@@ -27,16 +27,28 @@ const {
 
 const PORT = process.env.PORT || 3000;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-const MAX_WEBSOCKET_PAYLOAD_BYTES = 10 * 1024;
+const MAX_WEBSOCKET_PAYLOAD_BYTES = 32 * 1024;
 const sessions = new Map();
 const activeConnections = new Map(); // login -> { ws, userId }
 const allowedAvatars = new Set(['🙂', '😀', '😎', '🤩', '😇', '🥳', '🤔', '😴', '😡', '😭', '🐶', '🐱', '🦊', '🐼', '🐸', '🦁', '🐯', '🐨', '🐵', '🦄', '🐙', '🦋', '🌸', '🌈', '⭐', '🔥', '🍕', '🚀']);
 const audioDirectory = path.join(__dirname, 'uploads', 'audio');
 const MAX_AUDIO_BYTES = 8 * 1024 * 1024;
 const MESSAGE_RETENTION_DAYS = Math.max(1, Number(process.env.MESSAGE_RETENTION_DAYS) || 90);
+const MAX_CALL_DESCRIPTION_BYTES = 16 * 1024;
+const MAX_ICE_CANDIDATE_BYTES = 4 * 1024;
+const WEBSOCKET_HEARTBEAT_MS = 30 * 1000;
 fs.mkdirSync(audioDirectory, { recursive: true });
 
 const app = express();
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
+    'Permissions-Policy': 'camera=(), geolocation=(), microphone=(self)'
+  });
+  next();
+});
 app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -206,6 +218,16 @@ async function relayCallSignal(message, session, ws) {
   if (!Number.isInteger(dialogId) || !(await isDialogParticipant(dialogId, session.userId))) {
     return send(ws, { type: 'error', error: 'Звонок недоступен.' });
   }
+  if (['call_offer', 'call_answer'].includes(message.type) &&
+      (!message[message.type === 'call_offer' ? 'offer' : 'answer'] ||
+       typeof message[message.type === 'call_offer' ? 'offer' : 'answer'].sdp !== 'string' ||
+       message[message.type === 'call_offer' ? 'offer' : 'answer'].sdp.length > MAX_CALL_DESCRIPTION_BYTES)) {
+    return send(ws, { type: 'error', error: 'Некорректные данные звонка.' });
+  }
+  if (message.type === 'call_ice' &&
+      (!message.candidate || typeof message.candidate.candidate !== 'string' || message.candidate.candidate.length > MAX_ICE_CANDIDATE_BYTES)) {
+    return send(ws, { type: 'error', error: 'Некорректные данные соединения.' });
+  }
   const dialog = await getDialogForUser(dialogId, session.userId);
   if (!dialog) return send(ws, { type: 'error', error: 'Звонок недоступен.' });
   for (const connection of activeConnections.values()) {
@@ -227,6 +249,8 @@ async function broadcastUsers() {
 wss.on('connection', (ws) => {
   let session = null;
   let login = null;
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
 
   send(ws, { type: 'connected' });
 
@@ -319,8 +343,10 @@ wss.on('connection', (ws) => {
       try {
         const result = await deleteMessage(messageId, session.userId, dialogId);
         if (!result.changes) return send(ws, { type: 'error', error: 'Сообщение не найдено или принадлежит другому пользователю.' });
+        if (result.audioUrl) await fs.promises.unlink(path.join(audioDirectory, path.basename(result.audioUrl))).catch(() => {});
         const dialog = await getDialogForUser(dialogId, session.userId);
         sendToDialog(dialog, { type: 'message_deleted', messageId, dialogId });
+        await sendDialogLists(dialog);
       } catch (error) {
         console.error('Delete message error:', error);
         send(ws, { type: 'error', error: 'Не удалось удалить сообщение.' });
@@ -372,6 +398,18 @@ wss.on('connection', (ws) => {
     console.error('WebSocket connection error:', error.message);
   });
 });
+
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, WEBSOCKET_HEARTBEAT_MS);
+wss.on('close', () => clearInterval(heartbeat));
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {

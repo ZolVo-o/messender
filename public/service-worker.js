@@ -1,4 +1,4 @@
-const CACHE_NAME = 'krug-static-v1';
+const CACHE_NAME = 'krug-static-v3';
 const APP_SHELL = ['/', '/manifest.json', '/icon-192.svg', '/icon-512.svg'];
 
 self.addEventListener('install', (event) => {
@@ -20,6 +20,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname === '/service-worker.js') return;
 
+  // Авторизованные данные и записи не должны попадать в Cache Storage общего устройства.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/audio/')) return;
+
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).then((response) => {
@@ -31,13 +34,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-      if (response.ok) {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-      }
-      return response;
-    }))
-  );
+  event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+    const existing = clients[0];
+    if (existing) return existing.focus();
+    return self.clients.openWindow('/');
+  }));
 });

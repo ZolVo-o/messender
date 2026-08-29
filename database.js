@@ -43,6 +43,19 @@ async function initDB() {
     )
   `);
   await run(`
+    CREATE TABLE IF NOT EXISTS dialogs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_one_id INTEGER NOT NULL,
+      user_two_id INTEGER NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CHECK (user_one_id < user_two_id),
+      UNIQUE (user_one_id, user_two_id),
+      FOREIGN KEY (user_one_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_two_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await run(`
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -56,19 +69,6 @@ async function initDB() {
       reply_to_id INTEGER,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (dialog_id) REFERENCES dialogs(id) ON DELETE CASCADE
-    )
-  `);
-  await run(`
-    CREATE TABLE IF NOT EXISTS dialogs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_one_id INTEGER NOT NULL,
-      user_two_id INTEGER NOT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CHECK (user_one_id < user_two_id),
-      UNIQUE (user_one_id, user_two_id),
-      FOREIGN KEY (user_one_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (user_two_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
   const columns = await all('PRAGMA table_info(users)');
@@ -173,7 +173,8 @@ function getDialogsForUser(userId) {
     `SELECT dialogs.id, dialogs.user_one_id AS userOneId, dialogs.user_two_id AS userTwoId,
             dialogs.created_at AS createdAt, dialogs.updated_at AS updatedAt,
             other.id AS otherUserId, other.login AS otherLogin, other.avatar AS otherAvatar,
-            last_message.text AS lastMessage, last_message.timestamp AS lastMessageAt,
+            last_message.text AS lastMessage, last_message.audio_url AS lastAudioUrl,
+            last_message.timestamp AS lastMessageAt,
             (SELECT COUNT(*) FROM messages unread
              WHERE unread.dialog_id = dialogs.id) AS messageCount
      FROM dialogs
@@ -264,11 +265,17 @@ async function saveDialogMessage(dialogId, userId, username, text, replyToId = n
   );
 }
 
-function deleteMessage(messageId, userId, dialogId) {
-  return run(
+async function deleteMessage(messageId, userId, dialogId) {
+  const message = await get(
+    'SELECT audio_url AS audioUrl FROM messages WHERE id = ? AND user_id = ? AND dialog_id = ?',
+    [messageId, userId, dialogId]
+  );
+  if (!message) return { changes: 0, audioUrl: null };
+  const result = await run(
     'DELETE FROM messages WHERE id = ? AND user_id = ? AND dialog_id = ?',
     [messageId, userId, dialogId]
   );
+  return { ...result, audioUrl: message.audioUrl };
 }
 
 async function editMessage(messageId, userId, text, dialogId) {
