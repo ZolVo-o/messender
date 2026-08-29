@@ -141,6 +141,18 @@
     .reply-preview strong { display: block; margin-bottom: 2px; color: #8fc5f5; }
     .message-time { display: inline-block; margin: 4px 0 0 9px; color: #a9c2d5; font-size: 10px; vertical-align: bottom; white-space: nowrap; }
     .message-check { margin-left: 3px; color: #9fcfff; font-size: 11px; }
+    .voice-message { display: flex; align-items: center; min-width: 220px; gap: 10px; padding: 4px 0 2px; }
+    .voice-message audio { display: none; }
+    .voice-play { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: 50%; background: #70b8f5; color: #102130; font-size: 12px; }
+    .mine .voice-play { background: #d8f0ff; }
+    .voice-play span { margin-left: 2px; }
+    .voice-wave { display: flex; height: 32px; flex: 1; align-items: center; justify-content: space-between; gap: 2px; }
+    .voice-wave i { width: 3px; min-height: 5px; border-radius: 5px; background: #86b7d6; opacity: .7; }
+    .voice-message.playing .voice-wave i { animation: voice-wave .7s ease-in-out infinite alternate; }
+    .voice-message.playing .voice-wave i:nth-child(3n) { animation-delay: .2s; }
+    .voice-message.playing .voice-wave i:nth-child(4n) { animation-delay: .4s; }
+    @keyframes voice-wave { to { transform: scaleY(1.35); opacity: 1; } }
+    .voice-duration { color: #a9c2d5; font-size: 11px; white-space: nowrap; }
     .message-row.selected .message { outline: 2px solid #69b4ff; outline-offset: 2px; }
     .selection-toolbar { display: none; align-items: center; gap: 8px; min-height: 58px; padding: 7px 16px; border-bottom: 1px solid #ffffff12; background: #101b27f5; }
     .selection-toolbar.open { display: flex; }
@@ -183,23 +195,37 @@
     .emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
     .emoji-item { width: 100%; border-radius: 8px; padding: 6px 2px; background: transparent; font-size: 22px; line-height: 1; }
     .emoji-item:hover { background: var(--surface-hover); }
-    .send-button, .record-button { width: 42px; height: 42px; align-self: center; flex: 0 0 42px; border-radius: 50%; background: var(--blue); color: white; font-size: 18px; }
-    .record-button.recording { background: #d95858; }
+    .send-button, .record-button { width: 44px; height: 44px; align-self: center; flex: 0 0 44px; border-radius: 15px; background: var(--blue); color: white; font-size: 18px; box-shadow: 0 7px 18px #2787d04d; }
+    .record-button { position: relative; display: grid; place-items: center; background: #1d364a; color: #8fd2ff; box-shadow: none; }
+    .record-button::before { content: ''; width: 14px; height: 19px; border: 2px solid currentColor; border-radius: 9px; }
+    .record-button::after { content: ''; position: absolute; width: 22px; height: 11px; border: 2px solid currentColor; border-top: 0; border-radius: 0 0 14px 14px; transform: translateY(5px); }
+    .record-button.recording { background: #d95858; color: white; animation: recording-pulse 1.1s infinite; }
+    .record-button.recording::before { width: 14px; height: 14px; border: 0; border-radius: 4px; background: currentColor; }
+    .record-button.recording::after { display: none; }
+    @keyframes recording-pulse { 50% { box-shadow: 0 0 0 8px #d9585833; } }
     .recording-status { display: none; align-self: center; min-width: 0; flex: 1; color: #ffaaaa; font-size: 12px; text-align: right; }
     .recording-status.visible { display: block; color: #ffb1b1; }
     .call-button { min-width: 44px; min-height: 44px; border-radius: 50%; color: white; background: transparent; font-size: 19px; }
     .call-button.active { background: #d95858; }
-    .call-screen { position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; background: radial-gradient(circle at 50% 15%, #234b70 0, #0b131d 46%); }
+    .call-screen { position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; overflow: hidden; background: radial-gradient(circle at 50% 15%, #28618f 0, #0b131d 50%); }
     .call-screen.hidden { display: none; }
+    .call-screen::before, .call-screen::after { content: ''; position: absolute; width: 300px; height: 300px; border: 1px solid #a8d9ff22; border-radius: 50%; left: 50%; top: 42%; transform: translate(-50%, -50%); pointer-events: none; }
+    .call-screen::after { width: 410px; height: 410px; border-color: #a8d9ff12; }
     .call-screen-head { display: flex; align-items: center; justify-content: space-between; padding: max(18px, env(safe-area-inset-top)) 20px 18px; }
     .call-screen-head strong { font-size: 16px; }
     .call-screen-close { width: 44px; height: 44px; border-radius: 50%; background: #ffffff12; color: white; font-size: 24px; }
-    .call-profile { display: grid; justify-items: center; gap: 14px; margin: auto; }
-    .call-avatar { display: grid; place-items: center; width: 112px; height: 112px; border-radius: 50%; background: linear-gradient(145deg, #63b5ff, #7357d8); font-size: 48px; box-shadow: 0 18px 50px #0006; }
+    .call-profile { position: relative; z-index: 1; display: grid; justify-items: center; gap: 14px; margin: auto; }
+    .call-avatar { display: grid; place-items: center; width: 118px; height: 118px; border: 7px solid #ffffff1f; border-radius: 50%; background: linear-gradient(145deg, #63b5ff, #7357d8); font-size: 48px; box-shadow: 0 18px 50px #0006; }
+    .call-screen.ringing .call-avatar { animation: call-pulse 1.4s ease-in-out infinite; }
+    @keyframes call-pulse { 50% { transform: scale(1.06); box-shadow: 0 0 0 18px #8dcfff1c, 0 18px 50px #0006; } }
     .call-name { font-size: 28px; font-weight: 800; }
     .call-status { color: #a8bfd2; font-size: 15px; }
-    .call-actions { display: flex; justify-content: center; gap: 18px; padding: 22px 20px max(28px, env(safe-area-inset-bottom)); }
-    .call-action { width: 58px; height: 58px; border-radius: 50%; background: #ffffff16; color: white; font-size: 23px; }
+    .call-actions { position: relative; z-index: 1; display: flex; justify-content: center; gap: 18px; padding: 22px 20px max(28px, env(safe-area-inset-bottom)); }
+    .call-action { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 20px; background: #ffffff16; color: white; font-size: 0; }
+    .call-action::before { font-size: 24px; }
+    #call-mute::before { content: '♩'; }
+    #call-accept::before { content: '☎'; transform: rotate(-25deg); }
+    #call-end::before { content: '☎'; transform: rotate(135deg); }
     .call-action.active { background: #438fe0; }
     .call-action.end { background: #d95858; }
     .page-screen { position: absolute; inset: 0; z-index: 6; display: none; flex-direction: column; background: var(--surface); }
@@ -840,7 +866,7 @@
       <form id="message-form" class="composer hidden">
         <div class="emoji-wrap"><button id="emoji-button" class="emoji-button" type="button" aria-label="Открыть смайлики">☺</button><div id="emoji-picker" class="emoji-picker hidden"><div class="emoji-heading"><span>Выберите эмоцию</span><span>😊</span></div><div id="emoji-grid" class="emoji-grid"></div></div></div>
         <textarea id="message-input" placeholder="Написать сообщение..." maxlength="2000" autocomplete="off" rows="1" required></textarea>
-        <span id="recording-status" class="recording-status" aria-live="polite"></span><button id="record-button" class="record-button" type="button" aria-label="Удерживайте для записи голосового сообщения">●</button>
+        <span id="recording-status" class="recording-status" aria-live="polite"></span><button id="record-button" class="record-button" type="button" aria-label="Удерживайте для записи голосового сообщения"></button>
         <button class="send-button" type="submit" aria-label="Отправить сообщение">➤</button>
       </form>
       </div>
@@ -851,7 +877,7 @@
       <div id="call-screen" class="call-screen hidden" aria-live="polite">
         <header class="call-screen-head"><strong>Аудиозвонок</strong><button id="call-screen-close" class="call-screen-close" type="button" aria-label="Закрыть звонок">×</button></header>
         <div class="call-profile"><div id="call-avatar" class="call-avatar">🙂</div><div id="call-name" class="call-name">Собеседник</div><div id="call-status" class="call-status">Соединение...</div></div>
-        <div class="call-actions"><button id="call-mute" class="call-action" type="button" aria-label="Выключить микрофон">♩</button><button id="call-accept" class="call-action active hidden" type="button" aria-label="Ответить на звонок">☎</button><button id="call-end" class="call-action end" type="button" aria-label="Завершить звонок">☎</button></div>
+        <div class="call-actions"><button id="call-mute" class="call-action" type="button" aria-label="Выключить микрофон"></button><button id="call-accept" class="call-action active hidden" type="button" aria-label="Ответить на звонок"></button><button id="call-end" class="call-action end" type="button" aria-label="Завершить звонок"></button></div>
       </div>
     </div>
   </section>
@@ -877,7 +903,7 @@
       return true;
     };
     const hasNativeMicrophonePermissionBridge = () => typeof window.KrugAndroid?.requestMicrophone === 'function';
-    let token = null, username = '', avatar = '🙂', profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, reconnectDelay = 1000, intentionallyClosed = false, authMode = 'login', users = [], dialogs = [], currentDialog = null, activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null, mediaRecorder = null, recordingChunks = [], recordingStartedAt = 0, recordingStopTimer = null, recordingTimer = null, recordingRequested = false, recordingCancelled = false, recordingPointerId = null, recordingStartX = 0, callPeer = null, callStream = null, callDialogId = null, callMuted = false, pendingCall = null, callConfig = null, pendingIceCandidates = [], callTimeout = null;
+    let token = null, username = '', avatar = '🙂', profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, reconnectDelay = 1000, intentionallyClosed = false, authMode = 'login', users = [], dialogs = [], currentDialog = null, activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null, mediaRecorder = null, recordingChunks = [], recordingStartedAt = 0, recordingStopTimer = null, recordingTimer = null, recordingRequested = false, recordingCancelled = false, recordingPointerId = null, recordingStartX = 0, callPeer = null, callStream = null, callDialogId = null, callMuted = false, pendingCall = null, callConfig = null, pendingIceCandidates = [], callTimeout = null, callToneContext = null, callToneTimer = null;
     const typingUsers = new Set();
     const themes = { light: 'Графитовая', dark: 'Тёмная', night: 'Ночная' };
     function getTheme() { return localStorage.getItem('chatTheme') || 'light'; }
@@ -1202,7 +1228,7 @@
       const bubble = document.createElement('article'); bubble.className = 'message';
       if (!grouped) { const sender = document.createElement('div'); sender.className = 'sender'; sender.textContent = mine ? 'Вы' : message.username; bubble.appendChild(sender); }
       if (message.replyToId && message.replyText) { const reply = document.createElement('div'); reply.className = 'reply-preview'; const replyAuthor = document.createElement('strong'); replyAuthor.textContent = message.replyUsername === username ? 'Вы' : message.replyUsername; const replyText = document.createElement('span'); replyText.textContent = message.replyText; reply.append(replyAuthor, replyText); bubble.appendChild(reply); }
-      if (message.audioUrl) { const audio = document.createElement('audio'); audio.controls = true; audio.preload = 'metadata'; audio.setAttribute('aria-label', `Голосовое сообщение${message.audioDuration ? `, ${message.audioDuration} секунд` : ''}`); bubble.appendChild(audio); loadAudio(audio, message.audioUrl); }
+      if (message.audioUrl) { const voice = document.createElement('div'); voice.className = 'voice-message'; const play = document.createElement('button'); play.type = 'button'; play.className = 'voice-play'; play.setAttribute('aria-label', 'Воспроизвести голосовое сообщение'); const icon = document.createElement('span'); icon.textContent = '▶'; play.appendChild(icon); const waveform = document.createElement('div'); waveform.className = 'voice-wave'; for (let index = 0; index < 18; index += 1) { const bar = document.createElement('i'); bar.style.height = `${7 + ((index * 11) % 20)}px`; waveform.appendChild(bar); } const duration = document.createElement('span'); duration.className = 'voice-duration'; duration.textContent = message.audioDuration ? `${message.audioDuration} с` : 'Голосовое'; const audio = document.createElement('audio'); audio.preload = 'metadata'; audio.setAttribute('aria-label', `Голосовое сообщение${message.audioDuration ? `, ${message.audioDuration} секунд` : ''}`); play.addEventListener('click', () => { if (!audio.src) return; if (audio.paused) audio.play().catch(() => showChatNotice('Не удалось включить голосовое сообщение.')); else audio.pause(); }); audio.addEventListener('play', () => { icon.textContent = '❚❚'; play.setAttribute('aria-label', 'Поставить голосовое сообщение на паузу'); voice.classList.add('playing'); }); audio.addEventListener('pause', () => { icon.textContent = '▶'; play.setAttribute('aria-label', 'Воспроизвести голосовое сообщение'); voice.classList.remove('playing'); }); audio.addEventListener('ended', () => { audio.currentTime = 0; }); voice.append(play, waveform, duration, audio); bubble.appendChild(voice); loadAudio(audio, message.audioUrl); }
       const text = document.createElement('div'); text.className = 'message-text'; text.textContent = message.text;
       const time = document.createElement('time'); time.className = 'message-time'; time.textContent = formatTime(message.timestamp);
       if (mine) { const check = document.createElement('span'); check.className = 'message-check'; check.textContent = '✓'; time.appendChild(check); }
@@ -1288,8 +1314,8 @@
         if (!recordingRequested) { stream.getTracks().forEach((track) => track.stop()); return; }
         const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported(type));
         mediaRecorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined); recordingChunks = []; recordingStartedAt = Date.now(); mediaRecorder.addEventListener('dataavailable', (item) => { if (item.data.size) recordingChunks.push(item.data); });
-        mediaRecorder.addEventListener('stop', async () => { const recorder = mediaRecorder; const dialogId = currentDialog?.id; const duration = Math.min(30, Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))); const mimeType = recorder?.mimeType?.split(';')[0] || preferred?.split(';')[0] || 'audio/webm'; const blob = new Blob(recordingChunks, { type: mimeType }); stream.getTracks().forEach((track) => track.stop()); mediaRecorder = null; recordingRequested = false; recordingPointerId = null; clearTimeout(recordingStopTimer); clearInterval(recordingTimer); document.getElementById('record-button').classList.remove('recording'); document.getElementById('record-button').textContent = '●'; document.getElementById('recording-status').classList.remove('visible'); if (!recordingCancelled && dialogId && blob.size >= 256) await uploadAudio(blob, duration, dialogId); else if (!recordingCancelled) showChatNotice('Запись получилась слишком короткой.'); });
-        mediaRecorder.start(250); const button = document.getElementById('record-button'); button.classList.add('recording'); button.textContent = '■'; updateRecordingStatus(); recordingTimer = setInterval(updateRecordingStatus, 250); recordingStopTimer = setTimeout(() => stopRecording(false), 30000);
+        mediaRecorder.addEventListener('stop', async () => { const recorder = mediaRecorder; const dialogId = currentDialog?.id; const duration = Math.min(30, Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))); const mimeType = recorder?.mimeType?.split(';')[0] || preferred?.split(';')[0] || 'audio/webm'; const blob = new Blob(recordingChunks, { type: mimeType }); stream.getTracks().forEach((track) => track.stop()); mediaRecorder = null; recordingRequested = false; recordingPointerId = null; clearTimeout(recordingStopTimer); clearInterval(recordingTimer); document.getElementById('record-button').classList.remove('recording'); document.getElementById('recording-status').classList.remove('visible'); if (!recordingCancelled && dialogId && blob.size >= 256) await uploadAudio(blob, duration, dialogId); else if (!recordingCancelled) showChatNotice('Запись получилась слишком короткой.'); });
+        mediaRecorder.start(250); const button = document.getElementById('record-button'); button.classList.add('recording'); updateRecordingStatus(); recordingTimer = setInterval(updateRecordingStatus, 250); recordingStopTimer = setTimeout(() => stopRecording(false), 30000);
       } catch (error) { recordingRequested = false; recordingPointerId = null; showChatNotice(microphoneErrorMessage(error)); }
     }
     function stopRecording(cancelled) { if (!mediaRecorder) { recordingRequested = false; return; } recordingCancelled ||= cancelled; if (mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
@@ -1309,27 +1335,31 @@
       return callConfig;
     }
     function setCallStatus(text) { document.getElementById('call-status').textContent = text; }
-    function showCallScreen(dialog, status, incoming = false) { callDialogId = dialog?.id || callDialogId; document.getElementById('call-name').textContent = dialog?.otherLogin || 'Собеседник'; document.getElementById('call-avatar').textContent = dialog?.otherAvatar || '🙂'; document.getElementById('call-accept').classList.toggle('hidden', !incoming); document.getElementById('call-mute').classList.toggle('hidden', incoming); setCallStatus(status); document.getElementById('call-screen').classList.remove('hidden'); }
+    function playBrowserTone(incoming) { if (!window.AudioContext && !window.webkitAudioContext) return; stopCallTone(); const AudioContextClass = window.AudioContext || window.webkitAudioContext; callToneContext = new AudioContextClass(); const tone = () => { if (!callToneContext) return; const oscillator = callToneContext.createOscillator(); const gain = callToneContext.createGain(); oscillator.frequency.value = incoming ? 880 : 440; gain.gain.setValueAtTime(0.035, callToneContext.currentTime); oscillator.connect(gain).connect(callToneContext.destination); oscillator.start(); oscillator.stop(callToneContext.currentTime + (incoming ? .55 : .35)); }; tone(); callToneTimer = setInterval(tone, incoming ? 1800 : 2600); }
+    function stopCallTone() { clearInterval(callToneTimer); callToneTimer = null; if (callToneContext) { callToneContext.close().catch(() => {}); callToneContext = null; } }
+    function startCallAudio(incoming) { if (typeof window.KrugAndroid?.startCallAudio === 'function') window.KrugAndroid.startCallAudio(incoming); else playBrowserTone(incoming); }
+    function stopCallAudio() { stopCallTone(); window.KrugAndroid?.stopCallAudio?.(); }
+    function showCallScreen(dialog, status, incoming = false) { callDialogId = dialog?.id || callDialogId; const screen = document.getElementById('call-screen'); document.getElementById('call-name').textContent = dialog?.otherLogin || 'Собеседник'; document.getElementById('call-avatar').textContent = dialog?.otherAvatar || '🙂'; document.getElementById('call-accept').classList.toggle('hidden', !incoming); document.getElementById('call-mute').classList.toggle('hidden', incoming); screen.classList.toggle('ringing', incoming); setCallStatus(status); screen.classList.remove('hidden'); }
     async function createCallPeer(dialogId) {
       callPeer = new RTCPeerConnection(await getCallConfig());
       callPeer.onicecandidate = (event) => event.candidate && socket?.send(JSON.stringify({ type: 'call_ice', dialogId, candidate: event.candidate }));
-      callPeer.ontrack = (event) => { const audio = document.createElement('audio'); audio.autoplay = true; audio.playsInline = true; audio.srcObject = event.streams[0]; document.body.appendChild(audio); audio.dataset.callAudio = 'true'; audio.play().catch(() => setCallStatus('Нажмите кнопку микрофона, чтобы включить звук')); };
-      callPeer.onconnectionstatechange = () => { if (callPeer?.connectionState === 'connected') { clearTimeout(callTimeout); setCallStatus('На связи'); } if (['failed', 'closed'].includes(callPeer?.connectionState)) endCall(false); if (callPeer?.connectionState === 'disconnected') setCallStatus('Восстанавливаем соединение...'); };
+      callPeer.ontrack = (event) => { const audio = document.createElement('audio'); audio.autoplay = true; audio.playsInline = true; audio.srcObject = event.streams[0]; document.body.appendChild(audio); audio.dataset.callAudio = 'true'; audio.play().catch(() => setCallStatus('Нажмите экран, чтобы включить звук')); };
+      callPeer.onconnectionstatechange = () => { if (callPeer?.connectionState === 'connected') { clearTimeout(callTimeout); stopCallTone(); document.getElementById('call-screen').classList.remove('ringing'); setCallStatus('На связи'); } if (['failed', 'closed'].includes(callPeer?.connectionState)) endCall(false); if (callPeer?.connectionState === 'disconnected') setCallStatus('Восстанавливаем соединение...'); };
       callTimeout = setTimeout(() => { if (callPeer?.connectionState !== 'connected') { setCallStatus('Не удалось соединиться'); setTimeout(() => endCall(true), 1200); } }, 30000);
     }
     async function addIceCandidate(candidate) { if (!callPeer || !callPeer.remoteDescription) { pendingIceCandidates.push(candidate); return; } try { await callPeer.addIceCandidate(candidate); } catch (_) {} }
     async function applyCallAnswer(answer) { if (!callPeer || !answer?.sdp) return; try { await callPeer.setRemoteDescription(answer); await Promise.all(pendingIceCandidates.splice(0).map((candidate) => callPeer.addIceCandidate(candidate).catch(() => {}))); setCallStatus('Соединение...'); } catch (_) { setCallStatus('Ошибка соединения'); setTimeout(() => endCall(true), 700); } }
     async function startCall() {
       if (!currentDialog || socket?.readyState !== WebSocket.OPEN) return showChatNotice('Сначала выберите диалог.');
-      try { callDialogId = currentDialog.id; pendingIceCandidates = []; showCallScreen(currentDialog, 'Подключаем микрофон...'); callStream = await getMicrophoneStream({ echoCancellation: true, noiseSuppression: true, autoGainControl: true }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); const offer = await callPeer.createOffer(); await callPeer.setLocalDescription(offer); socket.send(JSON.stringify({ type: 'call_offer', dialogId: callDialogId, offer: callPeer.localDescription })); setCallStatus('Вызов...'); document.getElementById('call-button').classList.add('active'); } catch (error) { endCall(false); showChatNotice(error?.message === 'config' ? 'Не удалось получить настройки соединения. Повторите попытку.' : microphoneErrorMessage(error)); }
+      try { callDialogId = currentDialog.id; pendingIceCandidates = []; showCallScreen(currentDialog, 'Подключаем микрофон...'); callStream = await getMicrophoneStream({ echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); const offer = await callPeer.createOffer(); await callPeer.setLocalDescription(offer); socket.send(JSON.stringify({ type: 'call_offer', dialogId: callDialogId, offer: callPeer.localDescription })); startCallAudio(false); setCallStatus('Вызов...'); document.getElementById('call-button').classList.add('active'); } catch (error) { endCall(false); showChatNotice(error?.message === 'config' ? 'Не удалось получить настройки соединения. Повторите попытку.' : microphoneErrorMessage(error)); }
     }
     async function receiveCall(data) {
       const dialog = dialogs.find((item) => item.id === data.dialogId) || (currentDialog?.id === data.dialogId ? currentDialog : null);
       if (!dialog || callPeer || pendingCall) return socket?.send(JSON.stringify({ type: 'call_reject', dialogId: data.dialogId }));
-      pendingIceCandidates = []; pendingCall = data; showCallScreen(dialog, 'Входящий вызов', true);
+      pendingIceCandidates = []; pendingCall = data; showCallScreen(dialog, 'Входящий вызов', true); startCallAudio(true);
     }
-    async function acceptCall() { if (!pendingCall) return; const data = pendingCall; pendingCall = null; document.getElementById('call-accept').classList.add('hidden'); document.getElementById('call-mute').classList.remove('hidden'); try { callDialogId = data.dialogId; setCallStatus('Подключаем микрофон...'); callStream = await getMicrophoneStream({ echoCancellation: true, noiseSuppression: true, autoGainControl: true }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); await callPeer.setRemoteDescription(data.offer); await Promise.all(pendingIceCandidates.splice(0).map((candidate) => callPeer.addIceCandidate(candidate).catch(() => {}))); const answer = await callPeer.createAnswer(); await callPeer.setLocalDescription(answer); socket.send(JSON.stringify({ type: 'call_answer', dialogId: callDialogId, answer: callPeer.localDescription })); setCallStatus('Соединение...'); document.getElementById('call-button').classList.add('active'); } catch (error) { endCall(true, data.dialogId, 'call_reject'); showChatNotice(microphoneErrorMessage(error)); } }
-    function endCall(notify = true, dialogId = callDialogId, signal = 'call_end') { if (notify && dialogId && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: signal, dialogId })); clearTimeout(callTimeout); pendingCall = null; pendingIceCandidates = []; callPeer?.close(); callPeer = null; callStream?.getTracks().forEach((track) => track.stop()); callStream = null; callDialogId = null; callMuted = false; document.querySelectorAll('audio[data-call-audio]').forEach((audio) => audio.remove()); document.getElementById('call-button').classList.remove('active'); document.getElementById('call-screen').classList.add('hidden'); }
+    async function acceptCall() { if (!pendingCall) return; const data = pendingCall; pendingCall = null; stopCallTone(); document.getElementById('call-accept').classList.add('hidden'); document.getElementById('call-mute').classList.remove('hidden'); try { callDialogId = data.dialogId; setCallStatus('Подключаем микрофон...'); callStream = await getMicrophoneStream({ echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }); await createCallPeer(callDialogId); callStream.getTracks().forEach((track) => callPeer.addTrack(track, callStream)); await callPeer.setRemoteDescription(data.offer); await Promise.all(pendingIceCandidates.splice(0).map((candidate) => callPeer.addIceCandidate(candidate).catch(() => {}))); const answer = await callPeer.createAnswer(); await callPeer.setLocalDescription(answer); socket.send(JSON.stringify({ type: 'call_answer', dialogId: callDialogId, answer: callPeer.localDescription })); setCallStatus('Соединение...'); document.getElementById('call-button').classList.add('active'); } catch (error) { endCall(true, data.dialogId, 'call_reject'); showChatNotice(microphoneErrorMessage(error)); } }
+    function endCall(notify = true, dialogId = callDialogId, signal = 'call_end') { if (notify && dialogId && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: signal, dialogId })); clearTimeout(callTimeout); stopCallAudio(); pendingCall = null; pendingIceCandidates = []; callPeer?.close(); callPeer = null; callStream?.getTracks().forEach((track) => track.stop()); callStream = null; callDialogId = null; callMuted = false; document.querySelectorAll('audio[data-call-audio]').forEach((audio) => audio.remove()); document.getElementById('call-button').classList.remove('active'); document.getElementById('call-screen').classList.add('hidden'); document.getElementById('call-screen').classList.remove('ringing'); }
     document.getElementById('call-button').addEventListener('click', () => callPeer ? endCall() : startCall());
     document.getElementById('call-screen-close').addEventListener('click', () => endCall());
     document.getElementById('call-accept').addEventListener('click', acceptCall);
