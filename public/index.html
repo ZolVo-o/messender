@@ -128,9 +128,6 @@
     .message-row { display: flex; gap: 8px; align-items: flex-end; margin: 2px 0; }
     .message-row.group-start { margin-top: 10px; }
     .message-row.mine { flex-direction: row-reverse; }
-    .avatar-spacer, .avatar { width: 30px; height: 30px; flex: 0 0 30px; font-size: 11px; }
-    .avatar { font-size: 16px; }
-    .avatar-spacer { visibility: hidden; }
     .message { position: relative; max-width: min(76%, 640px); border: 1px solid #2b3c4b; border-radius: 16px 16px 16px 5px; padding: 10px 13px 8px; background: var(--surface-soft); box-shadow: 0 3px 12px #00000020; }
     .mine .message { border-color: #2778c7; border-radius: 15px 15px 5px 15px; background: #1d5d98; }
     .group-start:not(.mine) .message::before { content: ""; position: absolute; left: -6px; bottom: -1px; width: 12px; height: 12px; background: var(--surface-soft); clip-path: polygon(100% 0, 100% 100%, 0 100%); }
@@ -1340,7 +1337,6 @@
       const wasNearBottom = loadingHistory || messages.scrollHeight - messages.scrollTop - messages.clientHeight < 120;
       emptyState.remove(); messages.classList.add('has-messages'); const mine = message.username === username; const dateLabel = formatDate(message.timestamp); if (dateLabel && dateLabel !== lastMessageDate) { const divider = document.createElement('div'); divider.className = 'date-divider'; divider.textContent = dateLabel; messages.appendChild(divider); lastMessageDate = dateLabel; lastMessageUser = ''; }
       const grouped = lastMessageUser === message.username; const row = document.createElement('div'); row.className = 'message-row' + (mine ? ' mine' : '') + (grouped ? '' : ' group-start'); row.dataset.messageId = String(message.id); row.dataset.username = message.username; row.dataset.timestamp = message.timestamp;
-      const avatarElement = document.createElement('div'); avatarElement.className = grouped ? 'avatar-spacer' : 'avatar'; avatarElement.textContent = grouped ? '' : (message.avatar || '🙂');
       const bubble = document.createElement('article'); bubble.className = 'message';
       if (!grouped) { const sender = document.createElement('div'); sender.className = 'sender'; sender.textContent = mine ? 'Вы' : message.username; bubble.appendChild(sender); }
       if (message.replyToId && message.replyText) { const reply = document.createElement('div'); reply.className = 'reply-preview'; const replyAuthor = document.createElement('strong'); replyAuthor.textContent = message.replyUsername === username ? 'Вы' : message.replyUsername; const replyText = document.createElement('span'); replyText.textContent = message.replyText; reply.append(replyAuthor, replyText); bubble.appendChild(reply); }
@@ -1355,7 +1351,7 @@
       row.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
       row.addEventListener('click', () => { if (lastPointerType === 'mouse') selectMessage(row); });
       row.addEventListener('contextmenu', (event) => { event.preventDefault(); selectMessage(row); });
-      row.dataset.userId = String(message.userId); bubble.append(text, time); row.append(avatarElement, bubble); messages.appendChild(row); updateChatPreview(); lastMessageUser = message.username; if (wasNearBottom) messages.scrollTop = messages.scrollHeight;
+      row.dataset.userId = String(message.userId); bubble.append(text, time); row.appendChild(bubble); messages.appendChild(row); updateChatPreview(); lastMessageUser = message.username; if (wasNearBottom) messages.scrollTop = messages.scrollHeight;
     }
     function updateReadReceipts(messageIds) {
       const readIds = new Set(messageIds.map(String));
@@ -1382,7 +1378,6 @@
         const dateLabel = formatDate(row.dataset.timestamp); const grouped = previousUsername === row.dataset.username && previousDate === dateLabel;
         if (dateLabel && dateLabel !== previousDate) { const divider = document.createElement('div'); divider.className = 'date-divider'; divider.textContent = dateLabel; row.before(divider); }
         row.classList.toggle('group-start', !grouped);
-        const avatarElement = row.firstElementChild; avatarElement.className = grouped ? 'avatar-spacer' : 'avatar'; avatarElement.textContent = grouped ? '' : (users.find((user) => String(user.id) === row.dataset.userId)?.avatar || '🙂');
         const bubble = row.querySelector('.message'); let sender = bubble.querySelector('.sender');
         if (grouped) sender?.remove();
         else if (sender) sender.textContent = row.classList.contains('mine') ? 'Вы' : row.dataset.username;
