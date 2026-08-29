@@ -1,7 +1,7 @@
 {
   "name": "Круг",
   "packageId": "ru.zolvo.krug",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "entry": "www/index.html",
   "orientation": "portrait",
   "permissions": ["INTERNET", "ACCESS_NETWORK_STATE", "RECORD_AUDIO", "POST_NOTIFICATIONS"],

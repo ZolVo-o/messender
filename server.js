@@ -61,7 +61,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/dialogs/:dialogId/audio', express.raw({ type: /^audio\//, limit: MAX_AUDIO_BYTES }), async (req, res) => {
+app.post('/api/dialogs/:dialogId/audio', express.raw({ type: () => true, limit: MAX_AUDIO_BYTES }), async (req, res) => {
   const session = getSessionFromRequest(req);
   const dialogId = Number(req.params.dialogId);
   const mime = req.get('content-type')?.split(';')[0].toLowerCase() || '';

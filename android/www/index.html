@@ -959,9 +959,10 @@
     setAuthMode('login');
     function connectWebSocket() {
       if (!token || intentionallyClosed || (socket && [WebSocket.CONNECTING, WebSocket.OPEN].includes(socket.readyState))) return; setConnectionStatus('подключение...', false);
-      socket = new WebSocket(webSocketEndpoint());
-      socket.addEventListener('open', () => { reconnectDelay = 1000; setConnectionStatus('онлайн', true); socket.send(JSON.stringify({ type: 'auth', token })); });
-      socket.addEventListener('message', (event) => {
+      const nextSocket = new WebSocket(webSocketEndpoint()); socket = nextSocket;
+      nextSocket.addEventListener('open', () => { if (socket !== nextSocket) return; reconnectDelay = 1000; setConnectionStatus('онлайн', true); nextSocket.send(JSON.stringify({ type: 'auth', token })); });
+      nextSocket.addEventListener('message', (event) => {
+        if (socket !== nextSocket) return;
         let data; try { data = JSON.parse(event.data); } catch (_) { return showChatNotice('Получены повреждённые данные.'); }
         if (data.type === 'dialogs' || data.type === 'dialog_updated') { dialogs = data.dialogs || []; renderDialogs(); }
         if (data.type === 'dialog_opened') { openDialogView(data.dialog, data.messages || []); }
@@ -981,7 +982,7 @@
         if (data.type === 'error') showChatNotice(data.error);
         if (data.type === 'auth_error') logout(data.error);
       });
-      socket.addEventListener('close', () => { if (!token || intentionallyClosed) return; setConnectionStatus(navigator.onLine === false ? 'нет интернета' : 'нет связи · повторяем', false); clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectWebSocket, reconnectDelay); reconnectDelay = Math.min(reconnectDelay * 2, 30000); });
+      nextSocket.addEventListener('close', () => { if (socket !== nextSocket || !token || intentionallyClosed) return; setConnectionStatus(navigator.onLine === false ? 'нет интернета' : 'нет связи · повторяем', false); clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connectWebSocket, reconnectDelay); reconnectDelay = Math.min(reconnectDelay * 2, 30000); });
     }
     function logout(reason = '') {
       intentionallyClosed = true; endCall(true); token = null; localStorage.removeItem('chatSession'); clearTimeout(reconnectTimer); if (socket) socket.close();
@@ -1259,16 +1260,17 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         if (!recordingRequested) { stream.getTracks().forEach((track) => track.stop()); return; }
-        const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((type) => MediaRecorder.isTypeSupported(type));
+        const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find((type) => MediaRecorder.isTypeSupported(type));
         mediaRecorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined); recordingChunks = []; recordingStartedAt = Date.now(); mediaRecorder.addEventListener('dataavailable', (item) => { if (item.data.size) recordingChunks.push(item.data); });
-        mediaRecorder.addEventListener('stop', async () => { const recorder = mediaRecorder; const dialogId = currentDialog?.id; const duration = Math.min(30, Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))); const blob = new Blob(recordingChunks, { type: recorder?.mimeType || 'audio/webm' }); stream.getTracks().forEach((track) => track.stop()); mediaRecorder = null; recordingRequested = false; recordingPointerId = null; clearTimeout(recordingStopTimer); clearInterval(recordingTimer); document.getElementById('record-button').classList.remove('recording'); document.getElementById('record-button').textContent = '●'; document.getElementById('recording-status').classList.remove('visible'); if (!recordingCancelled && dialogId && blob.size >= 256) await uploadAudio(blob, duration, dialogId); else if (!recordingCancelled) showChatNotice('Запись получилась слишком короткой.'); });
+        mediaRecorder.addEventListener('stop', async () => { const recorder = mediaRecorder; const dialogId = currentDialog?.id; const duration = Math.min(30, Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))); const mimeType = recorder?.mimeType?.split(';')[0] || preferred?.split(';')[0] || 'audio/webm'; const blob = new Blob(recordingChunks, { type: mimeType }); stream.getTracks().forEach((track) => track.stop()); mediaRecorder = null; recordingRequested = false; recordingPointerId = null; clearTimeout(recordingStopTimer); clearInterval(recordingTimer); document.getElementById('record-button').classList.remove('recording'); document.getElementById('record-button').textContent = '●'; document.getElementById('recording-status').classList.remove('visible'); if (!recordingCancelled && dialogId && blob.size >= 256) await uploadAudio(blob, duration, dialogId); else if (!recordingCancelled) showChatNotice('Запись получилась слишком короткой.'); });
         mediaRecorder.start(250); const button = document.getElementById('record-button'); button.classList.add('recording'); button.textContent = '■'; updateRecordingStatus(); recordingTimer = setInterval(updateRecordingStatus, 250); recordingStopTimer = setTimeout(() => stopRecording(false), 30000);
-      } catch (_) { recordingRequested = false; recordingPointerId = null; showChatNotice('Нет доступа к микрофону. Разрешите запись в браузере.'); }
+      } catch (_) { recordingRequested = false; recordingPointerId = null; showChatNotice('Нет доступа к микрофону. Разрешите запись в приложении.'); }
     }
     function stopRecording(cancelled) { if (!mediaRecorder) { recordingRequested = false; return; } recordingCancelled ||= cancelled; if (mediaRecorder.state !== 'inactive') mediaRecorder.stop(); }
     function handleRecordingMove(event) { if (!mediaRecorder || event.pointerId !== recordingPointerId) return; recordingCancelled = (recordingStartX - event.clientX) > 80; updateRecordingStatus(); }
     async function uploadAudio(blob, duration, dialogId) {
-      try { const response = await fetch(serverEndpoint(`/api/dialogs/${dialogId}/audio`), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': blob.type, 'X-Audio-Duration': String(duration) }, body: blob }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка загрузки'); } catch (error) { showChatNotice(error.message); }
+      const mimeType = blob.type?.split(';')[0] || 'audio/webm';
+      try { const response = await fetch(serverEndpoint(`/api/dialogs/${dialogId}/audio`), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': mimeType, 'X-Audio-Duration': String(duration) }, body: blob }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка загрузки'); } catch (error) { showChatNotice(error.message || 'Не удалось отправить голосовое сообщение.'); }
     }
     const recordButton = document.getElementById('record-button'); recordButton.addEventListener('pointerdown', (event) => { event.preventDefault(); recordButton.setPointerCapture?.(event.pointerId); startRecording(event); }); recordButton.addEventListener('pointermove', handleRecordingMove); recordButton.addEventListener('pointerup', (event) => { if (event.pointerId === recordingPointerId) stopRecording(recordingCancelled); }); recordButton.addEventListener('lostpointercapture', () => stopRecording(recordingCancelled)); recordButton.addEventListener('pointercancel', () => stopRecording(true)); recordButton.addEventListener('contextmenu', (event) => event.preventDefault());
     window.addEventListener('blur', () => stopRecording(true));
