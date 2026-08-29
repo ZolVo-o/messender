@@ -1113,7 +1113,9 @@
         if (data.type === 'call_answer' && data.dialogId === callDialogId) applyCallAnswer(data.answer);
         if (data.type === 'call_ice' && data.candidate && data.dialogId === callDialogId) addIceCandidate(data.candidate);
         if ((data.type === 'call_end' || data.type === 'call_reject') && data.dialogId === callDialogId) { setCallStatus(data.type === 'call_reject' ? 'Вызов отклонён' : 'Звонок завершён'); setTimeout(() => endCall(false), 700); }
-        if (data.type === 'system') renderSystem(data.text);
+        // Статус присутствия показывается индикаторами в списке пользователей,
+        // поэтому служебные WebSocket-сообщения не должны заменять экран выбора чата.
+        if (data.type === 'system') return;
         if (data.type === 'users') { users = data.users; if (!currentDialog) showContactPicker(); }
         if (data.type === 'error') showChatNotice(data.error);
         if (data.type === 'auth_error') logout(data.error);
