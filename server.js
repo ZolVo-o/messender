@@ -37,6 +37,7 @@ const MESSAGE_RETENTION_DAYS = Math.max(1, Number(process.env.MESSAGE_RETENTION_
 const MAX_CALL_DESCRIPTION_BYTES = 16 * 1024;
 const MAX_ICE_CANDIDATE_BYTES = 4 * 1024;
 const WEBSOCKET_HEARTBEAT_MS = 30 * 1000;
+const releasesDirectory = path.join(__dirname, 'releases');
 fs.mkdirSync(audioDirectory, { recursive: true });
 
 const app = express();
@@ -60,6 +61,38 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+function getLatestAndroidRelease() {
+  let releases = [];
+  try {
+    releases = fs.readdirSync(releasesDirectory, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name.match(/^krug-android-v(\d+)\.(\d+)\.(\d+)\.apk$/))
+      .filter(Boolean)
+      .map((match) => ({
+        filename: match[0],
+        version: `${match[1]}.${match[2]}.${match[3]}`,
+        numbers: match.slice(1).map(Number)
+      }))
+      .sort((a, b) => b.numbers[0] - a.numbers[0] || b.numbers[1] - a.numbers[1] || b.numbers[2] - a.numbers[2]);
+  } catch (error) {
+    console.error('Android release lookup error:', error.message);
+  }
+  return releases[0] || null;
+}
+
+app.get('/api/android-release', (req, res) => {
+  const release = getLatestAndroidRelease();
+  if (!release) return res.status(404).json({ error: 'APK пока не опубликован.' });
+  return res.json({ version: release.version, downloadUrl: '/download/krug-latest.apk' });
+});
+
+app.get('/download/krug-latest.apk', (req, res) => {
+  const release = getLatestAndroidRelease();
+  if (!release) return res.status(404).send('APK пока не опубликован.');
+  res.set('Cache-Control', 'no-store');
+  return res.download(path.join(releasesDirectory, release.filename), 'krug-android-latest.apk');
+});
 
 app.get('/api/call-config', (req, res) => {
   if (!getSessionFromRequest(req)) return res.status(401).json({ error: 'Требуется авторизация.' });
