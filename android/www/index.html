@@ -839,6 +839,75 @@
     .auth-privacy { margin: 18px 0 0; color: #687f91; font-size: 11px; line-height: 1.5; text-align: center; }
     .auth-screen[data-auth-mode="register"] .auth-card { border-color: #4f9cf54d; }
     @media (max-width: 380px) { .auth-kicker { margin-bottom: 9px; } .auth-card h2 { font-size: 24px; } .auth-form-fields { gap: 11px; } .field input { min-height: 47px; } }
+
+    /* Новый единый стиль: тёплый тёмный интерфейс с акцентом на содержании. */
+    :root { --ink: #17202b; --paper: #f6f7f4; --card: #ffffff; --accent: #d66a42; --accent-dark: #b85231; --mint: #3f9e8c; --soft-accent: #fff0e8; --soft-mint: #e3f3ed; --border: #e4e7e3; --quiet: #69747b; --chat-bg: #edf0eb; --bubble: #ffffff; --outgoing: #dff1e9; --text: var(--ink); --muted: var(--quiet); --line: var(--border); --blue: var(--accent); --blue-dark: var(--accent-dark); --surface: var(--card); --surface-soft: #f2f4f0; --surface-hover: #e9ece7; }
+    html, body { background: var(--paper); color: var(--ink); }
+    body { background-image: radial-gradient(circle at 6% 2%, #f8d9c9 0, transparent 22%), radial-gradient(circle at 96% 96%, #cce8dc 0, transparent 22%); }
+    .auth-screen::before { background: #e98960; opacity: .13; }
+    .auth-screen::after { background: #4ba894; opacity: .13; }
+    .brand-mark, .sidebar-brand-mark, .rail-brand { background: linear-gradient(145deg, var(--accent), #ed9a6c); box-shadow: 0 12px 26px #d66a4238; }
+    .brand-block h1 { color: var(--ink); }
+    .brand-block p { color: #55616a; }
+    .auth-card { border-color: #ffffff; background: #fffffff0; box-shadow: 0 24px 60px #25323a1a; backdrop-filter: blur(18px); }
+    .auth-card::before { border-color: #d66a4226; box-shadow: 0 0 0 20px #d66a4208, 0 0 0 42px #d66a4205; }
+    .auth-kicker { color: var(--accent-dark); }
+    .auth-kicker::before { background: var(--mint); box-shadow: 0 0 0 4px #3f9e8c1c; }
+    .auth-tabs { border-color: #e6e7e2; background: #f3f4f1; }
+    .auth-tab { color: #6d777d; }
+    .auth-tab.active { background: var(--card); color: var(--ink); box-shadow: 0 3px 9px #26313a15; }
+    .field span { color: #46525a; }
+    .field input, .composer textarea, .chat-search { border-color: #dfe3de; background: #fbfcfa; color: var(--ink); }
+    .field input:focus, .composer textarea:focus, .chat-search:focus { border-color: #dc8968; box-shadow: 0 0 0 3px #d66a421a; }
+    .primary-button, .send-button { background: linear-gradient(135deg, var(--accent), #df8057); box-shadow: 0 9px 20px #d66a4233; }
+    .primary-button:hover, .send-button:hover { background: linear-gradient(135deg, #dc754c, var(--accent)); box-shadow: 0 11px 24px #d66a4240; }
+    .password-toggle, .auth-switch button { color: var(--accent-dark); }
+    .password-toggle:hover, .auth-switch button:hover { background: var(--soft-accent); color: #914125; }
+    .chat-screen { background: transparent; }
+    .app-shell { border: 1px solid #ffffff; border-radius: 26px; background: var(--card); box-shadow: 0 20px 55px #27333c1c; }
+    .app-rail { background: #25333d; border-color: #34434c; }
+    .rail-button { color: #aeb9bd; }
+    .rail-button:hover, .rail-button.active { background: #ffffff16; color: #ffd6c4; }
+    .sidebar { background: #f8f9f6; border-color: var(--border); }
+    .sidebar-top, .sidebar-brand { border-color: var(--border); }
+    .sidebar-heading, .sidebar-brand { color: var(--ink); }
+    .chat-search { background: #eef0ed; }
+    .chat-item { color: var(--ink); }
+    .chat-item:hover, .chat-item.active { background: var(--soft-accent); }
+    .chat-item .avatar, .avatar, .chat-logo { background: linear-gradient(145deg, #f0a078, var(--accent)); color: white; }
+    .nav-button { color: #56626a; }
+    .nav-button:hover, .nav-button.active { background: var(--soft-accent); color: var(--accent-dark); }
+    .nav-icon { color: var(--accent); }
+    .sidebar-account { border-color: var(--border); background: #f3f5f1; }
+    .chat { background: var(--chat-bg); }
+    .chat-header { border-color: #dfe4de; background: #ffffffeb; backdrop-filter: blur(14px); }
+    .chat-title strong { color: var(--ink); }
+    .status-dot.online { background: var(--mint); }
+    .status-dot { background: #c6a162; }
+    .header-icon-button, .header-profile, .call-button, .menu-button, .page-back, .reply-cancel { border-color: #eadfd9; background: #fff8f4; color: var(--accent-dark); }
+    .header-icon-button:hover, .header-profile:hover, .call-button:hover, .menu-button:hover, .page-back:hover, .reply-cancel:hover { border-color: #e8b69e; background: var(--soft-accent); color: #974427; }
+    .messages { background-image: radial-gradient(#ccd3cd 1px, transparent 1px); background-size: 22px 22px; }
+    .message { border-color: #e3e6e1; background: var(--bubble); box-shadow: 0 3px 10px #34404a12; color: var(--ink); }
+    .mine .message { border-color: #c4e3d7; background: var(--outgoing); }
+    .group-start:not(.mine) .message::before { background: var(--bubble); }
+    .group-start.mine .message::before { background: var(--outgoing); }
+    .sender, .reply-preview strong { color: var(--accent-dark); }
+    .reply-preview { border-color: var(--accent); background: #fff8f4; color: #627078; }
+    .message-time, .voice-duration { color: #718078; }
+    .composer, .reply-bar { border-color: #dce2dc; background: #ffffffee; backdrop-filter: blur(14px); }
+    .emoji-button { color: #6c797e; }
+    .record-button { background: #eaf0ec; color: #5d716a; }
+    .record-button.recording { background: #f8dfd5; color: #a4472b; box-shadow: 0 0 0 4px #d66a4222; }
+    .page-screen, .details-drawer { background: #f7f8f5; }
+    .page-head { border-color: var(--border); background: #ffffffef; }
+    .setting-row, .profile-info-row, .profile-stat, .profile-info-list { border-color: var(--border); background: var(--card); }
+    .setting-button, .profile-action { border-color: #e6c8b9; background: #fff8f4; color: var(--accent-dark); }
+    .setting-button:hover:not(:disabled), .profile-action:hover { border-color: #dd997a; background: var(--soft-accent); color: #954326; }
+    .call-screen { background: radial-gradient(circle at 50% 8%, #f5ad89 0, #d86e48 32%, #283c42 100%); }
+    .call-avatar { background: #ffffff28; }
+    .call-action { background: #ffffff1d; }
+    .call-action.active { background: var(--mint); }
+    @media (max-width: 700px) { .app-shell { border: 0; border-radius: 0; } .sidebar { background: #f8f9f6; } .chat { background: var(--chat-bg); } }
   </style>
 </head>
 <body>
@@ -1044,7 +1113,7 @@
         if (data.type === 'call_answer' && data.dialogId === callDialogId) applyCallAnswer(data.answer);
         if (data.type === 'call_ice' && data.candidate && data.dialogId === callDialogId) addIceCandidate(data.candidate);
         if ((data.type === 'call_end' || data.type === 'call_reject') && data.dialogId === callDialogId) { setCallStatus(data.type === 'call_reject' ? 'Вызов отклонён' : 'Звонок завершён'); setTimeout(() => endCall(false), 700); }
-        if (data.type === 'system' && !data.text.includes(`Пользователь ${username} вошел`) && !data.text.includes(`Пользователь ${username} покинул`)) renderSystem(data.text);
+        if (data.type === 'system') renderSystem(data.text);
         if (data.type === 'users') { users = data.users; if (!currentDialog) showContactPicker(); }
         if (data.type === 'error') showChatNotice(data.error);
         if (data.type === 'auth_error') logout(data.error);

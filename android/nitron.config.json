@@ -1,7 +1,7 @@
 {
   "name": "Круг",
   "packageId": "ru.zolvo.krug",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "icon": "./www/icon-512.png",
   "entry": "www/index.html",
   "orientation": "portrait",
@@ -14,6 +14,6 @@
     "clearCacheOnStart": false
   },
   "splashScreen": {
-    "backgroundColor": "#080d14"
+    "backgroundColor": "#f6f7f4"
   }
 }

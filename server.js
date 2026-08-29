@@ -333,7 +333,6 @@ wss.on('connection', (ws) => {
       send(ws, { type: 'dialogs', dialogs: await getDialogsForUser(session.userId) });
       send(ws, { type: 'profile', profile: await getUserProfile(session.userId) });
       await broadcastUsers();
-      broadcast({ type: 'system', text: `Пользователь ${login} вошел в чат` });
       return;
     }
 
@@ -446,7 +445,6 @@ wss.on('connection', (ws) => {
     if (login && activeConnections.get(login)?.ws === ws) {
       activeConnections.delete(login);
       broadcastUsers().catch((error) => console.error('Presence error:', error));
-      broadcast({ type: 'system', text: `Пользователь ${login} покинул чат` });
     }
   });
 
