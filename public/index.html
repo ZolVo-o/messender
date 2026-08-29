@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icon-192.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-192.svg">
-  <title>Круг — общий чат</title>
+  <title>Круг — личные сообщения</title>
   <style>
     :root {
       color-scheme: dark;
@@ -204,6 +204,8 @@
     .panel-section { margin-top: 20px; }
     .panel-section h3 { margin: 0 0 10px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
     .person { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #ffffff0a; }
+    .person.contact-button { width: 100%; border-radius: 12px; padding: 10px 8px; background: transparent; color: var(--text); text-align: left; }
+    .person.contact-button:hover, .person.contact-button:focus-visible { background: var(--surface-hover); outline: none; }
     .person .avatar { width: 35px; height: 35px; }
     .person-name { flex: 1; font-size: 14px; }
     .presence { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; }
@@ -502,7 +504,7 @@
       <div class="brand-block">
         <div class="brand-mark">↗</div>
         <h1>Разговоры, которые всегда рядом.</h1>
-        <p>Простой общий чат для своей компании. Без лишнего шума — только люди и сообщения.</p>
+        <p>Личные сообщения, контакты и звонки в одном спокойном пространстве.</p>
       </div>
       <div class="auth-card">
         <h2 id="auth-title">Вход в чат</h2>
@@ -528,16 +530,16 @@
       <aside class="app-rail" aria-label="Быстрые разделы">
         <div class="rail-brand">↗</div>
         <nav class="rail-nav">
-          <button class="nav-button rail-button active" data-panel="chat" type="button" aria-label="Общий чат">▣</button>
-          <button class="nav-button rail-button" data-panel="people" type="button" aria-label="Участники">♙</button>
+          <button class="nav-button rail-button active" data-panel="chat" type="button" aria-label="Сообщения">▣</button>
+          <button class="nav-button rail-button" data-panel="people" type="button" aria-label="Контакты">♙</button>
         </nav>
         <div class="rail-spacer"></div>
       </aside>
       <aside id="sidebar" class="sidebar">
         <div class="sidebar-main">
-          <div class="sidebar-top"><h2 class="sidebar-heading">Сообщения</h2><p class="sidebar-caption">Ваше пространство для общения</p><input id="chat-search" class="chat-search" placeholder="Поиск участников" autocomplete="off"></div>
+          <div class="sidebar-top"><h2 class="sidebar-heading">Сообщения</h2><p class="sidebar-caption">Ваше пространство для общения</p><input id="chat-search" class="chat-search" placeholder="Поиск" autocomplete="off"></div>
           <div class="chat-list"><div class="chat-list-label">Личные диалоги</div><div id="dialog-list"><p class="chat-item-preview">Выберите участника, чтобы начать переписку</p></div></div>
-          <button class="sidebar-people nav-button" data-panel="people" type="button"><span class="nav-icon">♙</span><strong>Участники</strong><span id="people-count" style="margin-left:auto;color:var(--muted)">0</span></button>
+          <button class="sidebar-people nav-button" data-panel="people" type="button"><span class="nav-icon">♙</span><strong>Контакты</strong><span id="people-count" style="margin-left:auto;color:var(--muted)">0</span></button>
           <div class="sidebar-account"><button id="account-profile" class="account-identity" type="button" aria-label="Открыть профиль"><div id="sidebar-avatar" class="avatar"></div><div><div id="sidebar-name" class="account-name"></div><div class="account-caption">В сети</div></div></button><div class="account-actions"><button class="account-settings nav-button" data-panel="settings" type="button"><span class="nav-icon">⚙</span>Настройки</button><button id="account-logout" class="account-logout-button" type="button">Выйти</button></div></div>
         </div>
       </aside>
@@ -572,7 +574,7 @@
       </div>
       <div id="details-drawer" class="drawer">
         <section class="details-panel">
-          <div class="details-head"><h2 id="panel-title">Участники</h2><button class="close-button" type="button">×</button></div>
+          <div class="details-head"><h2 id="panel-title">Контакты</h2><button class="close-button" type="button">×</button></div>
           <div id="panel-content"></div>
         </section>
       </div>
@@ -726,7 +728,9 @@
     function renderDialogs() {
       const list = document.getElementById('dialog-list'); list.replaceChildren();
       if (!dialogs.length) { const hint = document.createElement('p'); hint.className = 'chat-item-preview'; hint.textContent = 'Выберите участника, чтобы начать переписку'; list.appendChild(hint); return; }
+      const query = document.getElementById('chat-search').value.trim().toLowerCase();
       dialogs.forEach((dialog) => {
+        if (query && !dialog.otherLogin.toLowerCase().includes(query)) return;
         const button = document.createElement('button'); button.type = 'button'; button.className = 'chat-item'; button.dataset.dialogId = String(dialog.id);
         const userAvatar = document.createElement('div'); userAvatar.className = 'avatar'; userAvatar.textContent = dialog.otherAvatar || '🙂';
         const copy = document.createElement('div'); copy.className = 'chat-item-copy'; const title = document.createElement('div'); title.className = 'chat-item-title';
@@ -749,21 +753,25 @@
       const online = users.filter((user) => user.online).length;
       document.getElementById('people-count').textContent = online;
       const content = document.getElementById('panel-content'); content.replaceChildren();
-      const intro = document.createElement('p'); intro.style.cssText = 'margin:0 0 16px;color:var(--muted);font-size:13px'; intro.textContent = `${users.length} ${users.length === 1 ? 'участник' : 'участников'} · ${online} в сети`; content.appendChild(intro);
+      const newChat = document.createElement('button'); newChat.type = 'button'; newChat.className = 'sidebar-people'; newChat.style.cssText = 'width:100%;margin:0 0 12px;color:#8fc5f5'; newChat.textContent = '✎  Новый чат'; content.appendChild(newChat);
+      const contactSearch = document.createElement('input'); contactSearch.id = 'contacts-search'; contactSearch.className = 'chat-search'; contactSearch.placeholder = 'Поиск контактов'; contactSearch.autocomplete = 'off'; contactSearch.style.marginBottom = '12px'; content.appendChild(contactSearch);
+      const intro = document.createElement('p'); intro.style.cssText = 'margin:0 0 10px;color:var(--muted);font-size:12px'; intro.textContent = `${users.length} ${users.length === 1 ? 'контакт' : 'контактов'} · ${online} в сети`; content.appendChild(intro);
       users.slice().sort((a, b) => Number(b.online) - Number(a.online) || a.login.localeCompare(b.login)).forEach((user) => {
-        const row = document.createElement('div'); row.className = 'person';
+        const row = document.createElement('button'); row.type = 'button'; row.className = 'person contact-button';
         const avatar = document.createElement('div'); avatar.className = 'avatar'; avatar.textContent = user.avatar || '🙂';
         const name = document.createElement('div'); name.className = 'person-name'; name.textContent = user.login === username ? `${user.login} (вы)` : user.login;
         const presence = document.createElement('div'); presence.className = 'presence' + (user.online ? ' online' : '');
-        const dot = document.createElement('i'); const label = document.createElement('span'); label.textContent = user.online ? 'в сети' : 'не в сети'; presence.append(dot, label); row.append(avatar, name, presence); if (user.login !== username) { row.tabIndex = 0; row.addEventListener('click', () => { const dialog = dialogs.find((item) => item.otherUserId === user.id); if (dialog) openDialog(dialog); else if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'open_dialog', userId: user.id })); }); } content.appendChild(row);
+        const dot = document.createElement('i'); const label = document.createElement('span'); label.textContent = user.online ? 'в сети' : 'не в сети'; presence.append(dot, label); row.append(avatar, name, presence); if (user.login !== username) row.addEventListener('click', () => { const dialog = dialogs.find((item) => item.otherUserId === user.id); if (dialog) openDialog(dialog); else if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'open_dialog', userId: user.id })); }); else row.disabled = true; content.appendChild(row);
       });
-      filterPeople(document.getElementById('chat-search').value);
+      const filterContacts = () => { const query = contactSearch.value.trim().toLowerCase(); content.querySelectorAll('.contact-button').forEach((person) => { person.hidden = Boolean(query) && !person.textContent.toLowerCase().includes(query); }); };
+      contactSearch.addEventListener('input', filterContacts); newChat.addEventListener('click', () => contactSearch.focus()); filterContacts();
     }
     function filterPeople(value) {
       const query = value.trim().toLowerCase();
       document.querySelectorAll('.person').forEach((person) => {
         person.hidden = Boolean(query) && !person.textContent.toLowerCase().includes(query);
       });
+      renderDialogs();
     }
     function renderProfilePanel() {
       const content = document.getElementById('panel-content'); content.replaceChildren();
@@ -777,12 +785,12 @@
       const avatarTitle = document.createElement('h3'); avatarTitle.textContent = 'Выберите аватарку'; content.appendChild(avatarTitle);
       const picker = document.createElement('div'); picker.className = 'avatar-picker';
       avatarList.forEach((item) => { const choice = document.createElement('button'); choice.type = 'button'; choice.className = 'avatar-choice' + (item === avatar ? ' active' : ''); choice.textContent = item; choice.setAttribute('aria-label', `Выбрать аватарку ${item}`); choice.addEventListener('click', () => { if (socket?.readyState !== WebSocket.OPEN) return showChatNotice('Нет подключения. Повторите попытку после восстановления связи.'); socket.send(JSON.stringify({ type: 'update_avatar', avatar: item })); avatar = item; document.getElementById('sidebar-avatar').textContent = item; profileAvatar.textContent = item; picker.querySelectorAll('.avatar-choice').forEach((button) => button.classList.toggle('active', button === choice)); localStorage.setItem('chatSession', JSON.stringify({ token, username, avatar })); }); picker.appendChild(choice); }); content.appendChild(picker);
-      const note = document.createElement('p'); note.style.cssText = 'color:var(--muted);font-size:13px;line-height:1.5'; note.textContent = 'Ваш профиль виден участникам общего чата. Пароль хранится в базе только в защищённом виде.'; content.appendChild(note);
+      const note = document.createElement('p'); note.style.cssText = 'color:var(--muted);font-size:13px;line-height:1.5'; note.textContent = 'Ваш профиль виден пользователям, с которыми вы общаетесь. Пароль хранится в базе только в защищённом виде.'; content.appendChild(note);
     }
     function showPanel(panel) {
       activePanel = panel;
       if (panel === 'chat') { closeDrawers(); return; }
-      const title = { people: 'Участники', profile: 'Мой профиль', settings: 'Настройки' }[panel];
+      const title = { people: 'Контакты', profile: 'Мой профиль', settings: 'Настройки' }[panel];
       document.getElementById('panel-title').textContent = title;
       const content = document.getElementById('panel-content'); content.replaceChildren();
       if (panel === 'people') renderPeople();
