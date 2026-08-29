@@ -1,6 +1,7 @@
 node_modules/
 database.sqlite
 database.sqlite-*
+uploads/audio/
 *.log
 .env
 .env.*
