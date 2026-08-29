@@ -185,6 +185,8 @@
     .emoji-item:hover { background: var(--surface-hover); }
     .send-button, .record-button { width: 42px; height: 42px; align-self: center; flex: 0 0 42px; border-radius: 50%; background: var(--blue); color: white; font-size: 18px; }
     .record-button.recording { background: #d95858; }
+    .recording-status { display: none; align-self: center; min-width: 0; flex: 1; color: #ffaaaa; font-size: 12px; text-align: right; }
+    .recording-status.visible { display: block; color: #ffb1b1; }
     .call-button { min-width: 44px; min-height: 44px; border-radius: 50%; color: white; background: transparent; font-size: 19px; }
     .call-button.active { background: #d95858; }
     .send-button:hover { background: var(--blue-dark); }
@@ -564,7 +566,7 @@
       <form id="message-form" class="composer">
         <div class="emoji-wrap"><button id="emoji-button" class="emoji-button" type="button" aria-label="Открыть смайлики">☺</button><div id="emoji-picker" class="emoji-picker hidden"><div class="emoji-heading"><span>Выберите эмоцию</span><span>😊</span></div><div id="emoji-grid" class="emoji-grid"></div></div></div>
         <textarea id="message-input" placeholder="Написать сообщение..." maxlength="2000" autocomplete="off" rows="1" required></textarea>
-        <button id="record-button" class="record-button" type="button" aria-label="Записать голосовое сообщение">●</button>
+        <span id="recording-status" class="recording-status" aria-live="polite"></span><button id="record-button" class="record-button" type="button" aria-label="Удерживайте для записи голосового сообщения">●</button>
         <button class="send-button" type="submit" aria-label="Отправить сообщение">➤</button>
       </form>
       </div>
@@ -584,7 +586,7 @@
     const messages = document.getElementById('messages');
     const emptyState = document.getElementById('empty-state');
     const messageInput = document.getElementById('message-input');
-    let token = null, username = '', avatar = '🙂', profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, reconnectDelay = 1000, intentionallyClosed = false, authMode = 'login', users = [], dialogs = [], currentDialog = null, activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null, mediaRecorder = null, recordingChunks = [], recordingStartedAt = 0, recordingStopTimer = null, callPeer = null, callStream = null;
+    let token = null, username = '', avatar = '🙂', profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, reconnectDelay = 1000, intentionallyClosed = false, authMode = 'login', users = [], dialogs = [], currentDialog = null, activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null, mediaRecorder = null, recordingChunks = [], recordingStartedAt = 0, recordingStopTimer = null, recordingTimer = null, recordingRequested = false, recordingCancelled = false, recordingPointerId = null, recordingStartX = 0, callPeer = null, callStream = null;
     const typingUsers = new Set();
     const notificationsEnabled = () => localStorage.getItem('chatNotifications') === 'true';
     function updateViewportHeight() {
@@ -938,24 +940,26 @@
     messageInput.addEventListener('blur', () => { clearTimeout(typingTimer); if (socket?.readyState === WebSocket.OPEN && currentDialog) socket.send(JSON.stringify({ type: 'typing_stop', dialogId: currentDialog.id })); });
     messageInput.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); document.getElementById('message-form').requestSubmit(); } });
     document.getElementById('chat-search').addEventListener('input', (event) => filterPeople(event.target.value));
-    async function toggleRecording() {
-      const button = document.getElementById('record-button');
-      if (mediaRecorder) { mediaRecorder.stop(); return; }
-      if (!currentDialog) return showChatNotice('Сначала выберите диалог.');
-      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return showChatNotice('Этот браузер не поддерживает запись аудио.');
+    function updateRecordingStatus() { const status = document.getElementById('recording-status'); if (!mediaRecorder) { status.classList.remove('visible'); return; } const seconds = Math.min(30, Math.floor((Date.now() - recordingStartedAt) / 1000)); status.textContent = recordingCancelled ? 'Отпустите для отмены' : `● ${String(seconds).padStart(2, '0')} c · ${recordingStartX ? 'сдвиньте влево для отмены' : 'отпустите для отправки'}`; status.classList.add('visible'); }
+    async function startRecording(event) {
+      if (mediaRecorder || recordingRequested) return; if (!currentDialog) return showChatNotice('Сначала выберите диалог.'); if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return showChatNotice('Этот браузер не поддерживает запись аудио.');
+      recordingRequested = true; recordingCancelled = false; recordingPointerId = event.pointerId; recordingStartX = event.clientX || 0;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!recordingRequested) { stream.getTracks().forEach((track) => track.stop()); return; }
         const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((type) => MediaRecorder.isTypeSupported(type));
-        mediaRecorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined); recordingChunks = []; recordingStartedAt = Date.now();
-        mediaRecorder.addEventListener('dataavailable', (event) => { if (event.data.size) recordingChunks.push(event.data); });
-        mediaRecorder.addEventListener('stop', async () => { const duration = Math.min(30, Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))); stream.getTracks().forEach((track) => track.stop()); const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType || 'audio/webm' }); mediaRecorder = null; button.classList.remove('recording'); button.textContent = '●'; clearTimeout(recordingStopTimer); if (duration <= 30 && blob.size) await uploadAudio(blob, duration); });
-        mediaRecorder.start(); button.classList.add('recording'); button.textContent = '■'; recordingStopTimer = setTimeout(() => mediaRecorder?.stop(), 30000);
-      } catch (_) { showChatNotice('Нет доступа к микрофону. Разрешите запись в браузере.'); }
+        mediaRecorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined); recordingChunks = []; recordingStartedAt = Date.now(); mediaRecorder.addEventListener('dataavailable', (item) => { if (item.data.size) recordingChunks.push(item.data); });
+        mediaRecorder.addEventListener('stop', async () => { const dialogId = currentDialog?.id; const duration = Math.min(30, Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))); const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType || 'audio/webm' }); stream.getTracks().forEach((track) => track.stop()); mediaRecorder = null; recordingRequested = false; clearTimeout(recordingStopTimer); clearInterval(recordingTimer); document.getElementById('record-button').classList.remove('recording'); document.getElementById('record-button').textContent = '●'; document.getElementById('recording-status').classList.remove('visible'); if (!recordingCancelled && dialogId && blob.size) await uploadAudio(blob, duration, dialogId); });
+        mediaRecorder.start(); const button = document.getElementById('record-button'); button.classList.add('recording'); button.textContent = '■'; updateRecordingStatus(); recordingTimer = setInterval(updateRecordingStatus, 250); recordingStopTimer = setTimeout(() => stopRecording(false), 30000);
+      } catch (_) { recordingRequested = false; showChatNotice('Нет доступа к микрофону. Разрешите запись в браузере.'); }
     }
-    async function uploadAudio(blob, duration) {
-      try { const response = await fetch(`/api/dialogs/${currentDialog.id}/audio`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': blob.type, 'X-Audio-Duration': String(duration) }, body: blob }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка загрузки'); } catch (error) { showChatNotice(error.message); }
+    function stopRecording(cancelled) { if (!mediaRecorder) { recordingRequested = false; return; } recordingCancelled = cancelled; mediaRecorder.stop(); }
+    function handleRecordingMove(event) { if (!mediaRecorder || event.pointerId !== recordingPointerId) return; recordingCancelled = (recordingStartX - event.clientX) > 80; updateRecordingStatus(); }
+    async function uploadAudio(blob, duration, dialogId) {
+      try { const response = await fetch(`/api/dialogs/${dialogId}/audio`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': blob.type, 'X-Audio-Duration': String(duration) }, body: blob }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка загрузки'); } catch (error) { showChatNotice(error.message); }
     }
-    document.getElementById('record-button').addEventListener('click', toggleRecording);
+    const recordButton = document.getElementById('record-button'); recordButton.addEventListener('pointerdown', (event) => { event.preventDefault(); recordButton.setPointerCapture?.(event.pointerId); startRecording(event); }); recordButton.addEventListener('pointermove', handleRecordingMove); recordButton.addEventListener('pointerup', (event) => { if (event.pointerId === recordingPointerId) stopRecording(recordingCancelled); }); recordButton.addEventListener('pointercancel', () => stopRecording(true)); recordButton.addEventListener('contextmenu', (event) => event.preventDefault());
+    window.addEventListener('blur', () => stopRecording(true));
     async function startCall() {
       if (!currentDialog || socket?.readyState !== WebSocket.OPEN) return showChatNotice('Сначала выберите диалог.');
       try {

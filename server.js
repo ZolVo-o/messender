@@ -92,7 +92,7 @@ async function cleanupExpiredMessages() {
     const expired = await getExpiredMessages(MESSAGE_RETENTION_DAYS);
     const result = await deleteExpiredMessages(MESSAGE_RETENTION_DAYS);
     await Promise.all(expired.filter((item) => item.audioUrl).map((item) =>
-      fs.promises.unlink(path.join(__dirname, item.audioUrl.replace(/^\/audio\//, ''))).catch(() => {})
+      fs.promises.unlink(path.join(audioDirectory, path.basename(item.audioUrl))).catch(() => {})
     ));
     if (result.changes) console.log(`Очищено старых сообщений: ${result.changes}`);
   } catch (error) {
