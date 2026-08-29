@@ -17,6 +17,7 @@ const {
   getDialogsForUser,
   isDialogParticipant,
   getDialogMessages,
+  markDialogMessagesRead,
   getAudioMessage,
   saveDialogMessage,
   deleteMessage,
@@ -293,6 +294,13 @@ async function relayCallSignal(message, session, ws) {
   }
 }
 
+async function markDialogAsRead(dialogId, userId) {
+  const messageIds = await markDialogMessagesRead(dialogId, userId);
+  if (!messageIds.length) return;
+  const dialog = await getDialogForUser(dialogId, userId);
+  if (dialog) sendToDialog(dialog, { type: 'messages_read', dialogId, messageIds });
+}
+
 async function broadcastUsers() {
   const users = await getUsers();
   const online = new Set(activeConnections.keys());
@@ -344,10 +352,23 @@ wss.on('connection', (ws) => {
           : await getOrCreateDialog(session.userId, otherUserId);
         if (!dialog) return send(ws, { type: 'error', error: 'Диалог недоступен.' });
         const fullDialog = await getDialogForUser(dialog.id, session.userId);
+        await markDialogAsRead(dialog.id, session.userId);
         send(ws, { type: 'dialog_opened', dialog: fullDialog, messages: await getDialogMessages(dialog.id, session.userId, 100) });
         await send(ws, { type: 'dialogs', dialogs: await getDialogsForUser(session.userId) });
       } catch (error) {
         send(ws, { type: 'error', error: error.message === 'USER_NOT_FOUND' ? 'Пользователь не найден.' : 'Не удалось открыть диалог.' });
+      }
+      return;
+    }
+
+    if (message.type === 'read_messages') {
+      const dialogId = Number(message.dialogId);
+      if (!Number.isInteger(dialogId) || dialogId < 1) return send(ws, { type: 'error', error: 'Диалог недоступен.' });
+      try {
+        await markDialogAsRead(dialogId, session.userId);
+      } catch (error) {
+        if (error.message === 'DIALOG_FORBIDDEN') return send(ws, { type: 'error', error: 'Диалог недоступен.' });
+        console.error('Read receipt error:', error);
       }
       return;
     }

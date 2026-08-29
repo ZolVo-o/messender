@@ -63,9 +63,10 @@ async function initDB() {
       text TEXT NOT NULL,
       audio_url TEXT,
       audio_mime TEXT,
-      audio_duration INTEGER,
-      timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      username TEXT NOT NULL,
+       audio_duration INTEGER,
+       timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       read_at DATETIME,
+       username TEXT NOT NULL,
       reply_to_id INTEGER,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (dialog_id) REFERENCES dialogs(id) ON DELETE CASCADE
@@ -82,6 +83,7 @@ async function initDB() {
   if (!messageColumns.some((column) => column.name === 'audio_url')) await run('ALTER TABLE messages ADD COLUMN audio_url TEXT');
   if (!messageColumns.some((column) => column.name === 'audio_mime')) await run('ALTER TABLE messages ADD COLUMN audio_mime TEXT');
   if (!messageColumns.some((column) => column.name === 'audio_duration')) await run('ALTER TABLE messages ADD COLUMN audio_duration INTEGER');
+  if (!messageColumns.some((column) => column.name === 'read_at')) await run('ALTER TABLE messages ADD COLUMN read_at DATETIME');
   await run('CREATE INDEX IF NOT EXISTS messages_dialog_id_id ON messages(dialog_id, id)');
   await run('CREATE INDEX IF NOT EXISTS dialogs_user_one_id ON dialogs(user_one_id)');
   await run('CREATE INDEX IF NOT EXISTS dialogs_user_two_id ON dialogs(user_two_id)');
@@ -194,8 +196,9 @@ function getDialogMessages(dialogId, userId, limit = 50) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit) || 50));
   return all(
     `SELECT messages.id, messages.dialog_id AS dialogId, messages.user_id AS userId,
-            messages.username, messages.text, messages.timestamp, users.avatar,
-            messages.audio_url AS audioUrl, messages.audio_mime AS audioMime,
+             messages.username, messages.text, messages.timestamp, users.avatar,
+             messages.read_at AS readAt,
+             messages.audio_url AS audioUrl, messages.audio_mime AS audioMime,
             messages.audio_duration AS audioDuration,
             messages.reply_to_id AS replyToId, replied.username AS replyUsername,
             replied.text AS replyText
@@ -208,6 +211,22 @@ function getDialogMessages(dialogId, userId, limit = 50) {
      ORDER BY messages.id DESC LIMIT ?`,
     [dialogId, dialogId, userId, userId, safeLimit]
   ).then((rows) => rows.reverse());
+}
+
+async function markDialogMessagesRead(dialogId, userId) {
+  if (!(await isDialogParticipant(dialogId, userId))) throw new Error('DIALOG_FORBIDDEN');
+  const unread = await all(
+    `SELECT id FROM messages
+     WHERE dialog_id = ? AND user_id != ? AND read_at IS NULL`,
+    [dialogId, userId]
+  );
+  if (!unread.length) return [];
+  await run(
+    `UPDATE messages SET read_at = CURRENT_TIMESTAMP
+     WHERE dialog_id = ? AND user_id != ? AND read_at IS NULL`,
+    [dialogId, userId]
+  );
+  return unread.map((message) => message.id);
 }
 
 function getAudioMessage(audioUrl, userId) {
@@ -254,8 +273,9 @@ async function saveDialogMessage(dialogId, userId, username, text, replyToId = n
   await run('UPDATE dialogs SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [dialogId]);
   return get(
     `SELECT messages.id, messages.dialog_id AS dialogId, messages.user_id AS userId,
-            messages.username, messages.text, messages.timestamp, users.avatar,
-            messages.audio_url AS audioUrl, messages.audio_mime AS audioMime, messages.audio_duration AS audioDuration,
+             messages.username, messages.text, messages.timestamp, users.avatar,
+             messages.read_at AS readAt,
+             messages.audio_url AS audioUrl, messages.audio_mime AS audioMime, messages.audio_duration AS audioDuration,
             messages.reply_to_id AS replyToId, replied.username AS replyUsername,
             replied.text AS replyText
      FROM messages JOIN users ON users.id = messages.user_id
@@ -336,6 +356,7 @@ module.exports = {
   getDialogsForUser,
   isDialogParticipant,
   getDialogMessages,
+  markDialogMessagesRead,
   getAudioMessage,
   saveMessage,
   saveDialogMessage,

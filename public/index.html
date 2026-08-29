@@ -140,7 +140,8 @@
     .reply-preview { margin: 0 0 8px; border-left: 3px solid #72b7f7; border-radius: 4px; padding: 5px 8px; background: #ffffff0c; color: #b8d8f4; font-size: 11px; }
     .reply-preview strong { display: block; margin-bottom: 2px; color: #8fc5f5; }
     .message-time { display: inline-block; margin: 4px 0 0 9px; color: #a9c2d5; font-size: 10px; vertical-align: bottom; white-space: nowrap; }
-    .message-check { margin-left: 3px; color: #9fcfff; font-size: 11px; }
+    .message-check { margin-left: 3px; color: #9fcfff; font-size: 11px; font-weight: 800; letter-spacing: -2px; }
+    .message-check.read { color: #63cdb0; }
     .voice-message { display: flex; align-items: center; min-width: 220px; gap: 10px; padding: 4px 0 2px; }
     .voice-message audio { display: none; }
     .voice-play { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: 50%; background: #70b8f5; color: #102130; font-size: 12px; }
@@ -1026,7 +1027,10 @@
       badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
       badge.classList.toggle('hidden', unreadCount === 0);
     }
-    function markMessagesRead() { unreadCount = 0; updateUnreadCount(); }
+    function markMessagesRead() {
+      unreadCount = 0; updateUnreadCount();
+      if (currentDialog && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'read_messages', dialogId: currentDialog.id }));
+    }
     async function notifyAboutMessage(message) {
       if (message.username === username) return;
       if (!document.hidden && document.hasFocus()) return;
@@ -1103,9 +1107,10 @@
         if (data.type === 'dialogs' || data.type === 'dialog_updated') { dialogs = data.dialogs || []; renderDialogs(); }
         if (data.type === 'dialog_opened') { openDialogView(data.dialog, data.messages || []); }
         if (data.type === 'profile') { profile = data.profile || profile; if (activePanel === 'profile') renderProfilePanel(); }
-        if (data.type === 'message') { if (data.message.dialogId === currentDialog?.id) renderMessage(data.message); notifyAboutMessage(data.message); }
+        if (data.type === 'message') { if (data.message.dialogId === currentDialog?.id) { renderMessage(data.message); markMessagesRead(); } notifyAboutMessage(data.message); }
         if (data.type === 'message_edited' && data.message.dialogId === currentDialog?.id) updateEditedMessage(data.message);
         if (data.type === 'message_deleted' && data.dialogId === currentDialog?.id) removeMessage(data.messageId);
+        if (data.type === 'messages_read' && data.dialogId === currentDialog?.id) updateReadReceipts(data.messageIds || []);
         if (data.type === 'avatar_updated') updateAvatarInChat(data.userId, data.avatar);
         if (data.type === 'typing_start' && data.dialogId === currentDialog?.id) { typingUsers.add(data.username); renderTypingIndicator(); }
         if (data.type === 'typing_stop' && data.dialogId === currentDialog?.id) { typingUsers.delete(data.username); renderTypingIndicator(); }
@@ -1337,7 +1342,7 @@
       if (message.audioUrl) { const voice = document.createElement('div'); voice.className = 'voice-message'; const play = document.createElement('button'); play.type = 'button'; play.className = 'voice-play'; play.setAttribute('aria-label', 'Воспроизвести голосовое сообщение'); const icon = document.createElement('span'); icon.textContent = '▶'; play.appendChild(icon); const waveform = document.createElement('div'); waveform.className = 'voice-wave'; for (let index = 0; index < 18; index += 1) { const bar = document.createElement('i'); bar.style.height = `${7 + ((index * 11) % 20)}px`; waveform.appendChild(bar); } const duration = document.createElement('span'); duration.className = 'voice-duration'; duration.textContent = message.audioDuration ? `${message.audioDuration} с` : 'Голосовое'; const audio = document.createElement('audio'); audio.preload = 'metadata'; audio.setAttribute('aria-label', `Голосовое сообщение${message.audioDuration ? `, ${message.audioDuration} секунд` : ''}`); play.addEventListener('click', () => { if (!audio.src) return; if (audio.paused) audio.play().catch(() => showChatNotice('Не удалось включить голосовое сообщение.')); else audio.pause(); }); audio.addEventListener('play', () => { icon.textContent = '❚❚'; play.setAttribute('aria-label', 'Поставить голосовое сообщение на паузу'); voice.classList.add('playing'); }); audio.addEventListener('pause', () => { icon.textContent = '▶'; play.setAttribute('aria-label', 'Воспроизвести голосовое сообщение'); voice.classList.remove('playing'); }); audio.addEventListener('ended', () => { audio.currentTime = 0; }); voice.append(play, waveform, duration, audio); bubble.appendChild(voice); loadAudio(audio, message.audioUrl); }
       const text = document.createElement('div'); text.className = 'message-text'; text.textContent = message.text;
       const time = document.createElement('time'); time.className = 'message-time'; time.textContent = formatTime(message.timestamp);
-      if (mine) { const check = document.createElement('span'); check.className = 'message-check'; check.textContent = '✓'; time.appendChild(check); }
+      if (mine) { const check = document.createElement('span'); check.className = 'message-check' + (message.readAt ? ' read' : ''); check.textContent = message.readAt ? '✓✓' : '✓'; check.title = message.readAt ? 'Прочитано' : 'Отправлено'; time.appendChild(check); }
       let longPressStarted = false;
       let lastPointerType = '';
       row.addEventListener('pointerdown', (event) => { lastPointerType = event.pointerType; if (event.pointerType === 'mouse') return; longPressStarted = false; clearTimeout(longPressTimer); longPressTimer = setTimeout(() => { longPressStarted = true; selectMessage(row); }, 500); });
@@ -1346,6 +1351,15 @@
       row.addEventListener('click', () => { if (lastPointerType === 'mouse') selectMessage(row); });
       row.addEventListener('contextmenu', (event) => { event.preventDefault(); selectMessage(row); });
       row.dataset.userId = String(message.userId); bubble.append(text, time); row.append(avatarElement, bubble); messages.appendChild(row); updateChatPreview(); lastMessageUser = message.username; if (wasNearBottom) messages.scrollTop = messages.scrollHeight;
+    }
+    function updateReadReceipts(messageIds) {
+      const readIds = new Set(messageIds.map(String));
+      messages.querySelectorAll('.message-row.mine').forEach((row) => {
+        if (!readIds.has(row.dataset.messageId)) return;
+        const check = row.querySelector('.message-check');
+        if (!check) return;
+        check.textContent = '✓✓'; check.classList.add('read'); check.title = 'Прочитано';
+      });
     }
     function releaseAudioUrls(container) { container.querySelectorAll('audio[data-object-url]').forEach((audio) => { URL.revokeObjectURL(audio.dataset.objectUrl); audio.removeAttribute('data-object-url'); }); }
     async function loadAudio(audio, url) {
