@@ -1053,6 +1053,11 @@
       document.getElementById('connection-status').textContent = text;
       document.getElementById('status-dot').classList.toggle('online', online);
     }
+    function updateCurrentDialogPresence() {
+      if (!currentDialog) return;
+      const interlocutor = users.find((user) => String(user.id) === String(currentDialog.otherUserId));
+      document.getElementById('chat-subtitle').textContent = interlocutor?.online ? '· в сети' : '· не в сети';
+    }
     function setAuthBusy(busy) {
       authForm.querySelectorAll('button').forEach((button) => { button.disabled = busy; });
       authForm.querySelector('[data-action="login"]').textContent = busy ? 'Подождите...' : (authMode === 'login' ? 'Войти' : 'Зарегистрироваться');
@@ -1121,7 +1126,7 @@
         // Статус присутствия показывается индикаторами в списке пользователей,
         // поэтому служебные WebSocket-сообщения не должны заменять экран выбора чата.
         if (data.type === 'system') return;
-        if (data.type === 'users') { users = data.users; if (!currentDialog) showContactPicker(); }
+        if (data.type === 'users') { users = data.users; if (currentDialog) updateCurrentDialogPresence(); else showContactPicker(); }
         if (data.type === 'error') showChatNotice(data.error);
         if (data.type === 'auth_error') logout(data.error);
       });
@@ -1166,7 +1171,7 @@
     }
     function openDialogView(dialog, history) {
       closeDrawers(); releaseAudioUrls(messages); currentDialog = dialog; clearSelection(); cancelReply(); typingUsers.clear(); renderTypingIndicator(); loadingHistory = true;
-      document.getElementById('chat-title-text').textContent = dialog.otherLogin || 'Личный чат'; document.getElementById('chat-subtitle').textContent = '· личный диалог';
+      document.getElementById('chat-title-text').textContent = dialog.otherLogin || 'Личный чат'; updateCurrentDialogPresence();
       document.getElementById('chat-back').classList.remove('hidden'); document.getElementById('call-button').classList.remove('hidden'); document.getElementById('message-form').classList.remove('hidden'); messages.replaceChildren(); messages.classList.remove('has-messages'); lastMessageUser = ''; lastMessageDate = ''; history.forEach(renderMessage); loadingHistory = false; messages.scrollTop = messages.scrollHeight; if (!history.length) { emptyState.className = 'welcome'; emptyState.replaceChildren(); const emptyCopy = document.createElement('div'); const icon = document.createElement('div'); icon.className = 'welcome-icon'; icon.textContent = '✉'; const heading = document.createElement('strong'); heading.textContent = 'Начните разговор'; const text = document.createElement('p'); text.textContent = `Напишите первое сообщение для ${dialog.otherLogin}.`; emptyCopy.append(icon, heading, text); emptyState.appendChild(emptyCopy); messages.appendChild(emptyState); }
       markMessagesRead();
     }
