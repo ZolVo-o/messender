@@ -39,6 +39,7 @@ const MAX_CALL_DESCRIPTION_BYTES = 16 * 1024;
 const MAX_ICE_CANDIDATE_BYTES = 4 * 1024;
 const WEBSOCKET_HEARTBEAT_MS = 30 * 1000;
 const releasesDirectory = path.join(__dirname, 'releases');
+const adminLogin = cleanLogin(process.env.ADMIN_LOGIN).toLowerCase();
 fs.mkdirSync(audioDirectory, { recursive: true });
 
 const app = express();
@@ -156,6 +157,33 @@ function getSessionFromRequest(req) {
   return session && session.expiresAt >= Date.now() ? session : null;
 }
 
+function isAdmin(session) {
+  return Boolean(adminLogin) && session?.login.toLowerCase() === adminLogin;
+}
+
+app.get('/api/admin/overview', async (req, res) => {
+  const session = getSessionFromRequest(req);
+  if (!isAdmin(session)) return res.status(403).json({ error: 'Доступ к панели администратора запрещён.' });
+
+  try {
+    const users = await getUsers();
+    return res.json({
+      users: users.map((user) => ({
+        id: user.id,
+        login: user.login,
+        avatar: user.avatar,
+        createdAt: user.createdAt,
+        online: activeConnections.has(user.login)
+      })),
+      totalUsers: users.length,
+      onlineUsers: users.filter((user) => activeConnections.has(user.login)).length
+    });
+  } catch (error) {
+    console.error('Admin overview error:', error);
+    return res.status(500).json({ error: 'Не удалось загрузить данные панели.' });
+  }
+});
+
 async function cleanupExpiredMessages() {
   try {
     const expired = await getExpiredMessages(MESSAGE_RETENTION_DAYS);
@@ -197,7 +225,7 @@ app.post('/register', async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await createUser(login, passwordHash);
-    return res.status(201).json({ token: issueSession(user), login: user.login, avatar: user.avatar });
+    return res.status(201).json({ token: issueSession(user), login: user.login, avatar: user.avatar, isAdmin: isAdmin({ login: user.login }) });
   } catch (error) {
     if (error.code === 'SQLITE_CONSTRAINT') {
       return res.status(409).json({ error: 'Такой логин уже зарегистрирован.' });
@@ -218,7 +246,7 @@ app.post('/login', async (req, res) => {
     const user = await findUser(login);
     const valid = user && await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Неверный логин или пароль.' });
-    return res.json({ token: issueSession(user), login: user.login, avatar: user.avatar });
+    return res.json({ token: issueSession(user), login: user.login, avatar: user.avatar, isAdmin: isAdmin({ login: user.login }) });
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Ошибка сервера.' });

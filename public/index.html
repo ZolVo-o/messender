@@ -260,6 +260,12 @@
     .presence i { width: 7px; height: 7px; border-radius: 50%; background: #687986; }
     .presence.online { color: #6dcc88; }
     .presence.online i { background: #62c783; }
+    .admin-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .admin-metric { border: 1px solid #ffffff12; border-radius: 14px; padding: 16px; background: var(--surface-soft); }
+    .admin-metric strong { display: block; font-size: 26px; }
+    .admin-metric span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .admin-user-meta { margin-top: 2px; color: var(--muted); font-size: 11px; }
+    .admin-refresh { margin-left: auto; }
     .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 13px 0; border-bottom: 1px solid #ffffff0a; color: #c7d2db; font-size: 14px; }
     .switch { width: 42px; height: 24px; border-radius: 20px; padding: 3px; background: #40505d; }
     .switch::after { content: ""; display: block; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform .2s; }
@@ -946,7 +952,7 @@
         <button id="chat-back" class="chat-back hidden" type="button" aria-label="Вернуться к выбору чата">‹</button>
         <div class="chat-logo">К</div>
         <div class="chat-title"><strong id="chat-title-text">Выберите чат</strong><small><i id="status-dot" class="status-dot"></i><span id="connection-status">подключение...</span><span id="chat-subtitle" class="chat-subtitle">· в сети</span></small></div>
-        <div class="header-actions"><button id="call-button" class="call-button hidden" type="button" aria-label="Начать аудиозвонок"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.3 4.6 8.1 4c.8-.2 1.6.2 1.9.9l1.1 2.7c.3.7.1 1.5-.5 2l-1.5 1.2a13 13 0 0 0 4.2 4.2l1.2-1.5c.5-.6 1.3-.8 2-.5l2.7 1.1c.7.3 1.1 1.1.9 1.9l-.6 2.8c-.2.8-.9 1.3-1.7 1.3C10.5 20.1 3.9 13.5 3.9 6.3c0-.8.6-1.5 1.4-1.7Z"/></svg></button><button id="header-settings" class="header-icon-button" type="button" aria-label="Открыть настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v2.1m0 12.8v2.1m8.5-8.5h-2.1M5.6 12H3.5m14.5-6-1.5 1.5M7.5 16.5 6 18m12 0-1.5-1.5M7.5 7.5 6 6"/><circle cx="12" cy="12" r="3.2"/></svg></button><button id="header-profile" class="header-profile" type="button" aria-label="Открыть профиль"><span id="header-avatar">🙂</span></button></div>
+        <div class="header-actions"><button id="call-button" class="call-button hidden" type="button" aria-label="Начать аудиозвонок"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.3 4.6 8.1 4c.8-.2 1.6.2 1.9.9l1.1 2.7c.3.7.1 1.5-.5 2l-1.5 1.2a13 13 0 0 0 4.2 4.2l1.2-1.5c.5-.6 1.3-.8 2-.5l2.7 1.1c.7.3 1.1 1.1.9 1.9l-.6 2.8c-.2.8-.9 1.3-1.7 1.3C10.5 20.1 3.9 13.5 3.9 6.3c0-.8.6-1.5 1.4-1.7Z"/></svg></button><button id="header-admin" class="header-icon-button hidden" type="button" aria-label="Открыть панель администратора">⚙</button><button id="header-settings" class="header-icon-button" type="button" aria-label="Открыть настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v2.1m0 12.8v2.1m8.5-8.5h-2.1M5.6 12H3.5m14.5-6-1.5 1.5M7.5 16.5 6 18m12 0-1.5-1.5M7.5 7.5 6 6"/><circle cx="12" cy="12" r="3.2"/></svg></button><button id="header-profile" class="header-profile" type="button" aria-label="Открыть профиль"><span id="header-avatar">🙂</span></button></div>
       </header>
       <div id="selection-toolbar" class="selection-toolbar" aria-label="Действия с сообщением">
         <strong id="selection-label">Сообщение выбрано</strong>
@@ -1001,7 +1007,7 @@
       return true;
     };
     const hasNativeMicrophonePermissionBridge = () => typeof window.KrugAndroid?.requestMicrophone === 'function';
-    let token = null, username = '', avatar = '🙂', profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, reconnectDelay = 1000, intentionallyClosed = false, authMode = 'login', users = [], dialogs = [], currentDialog = null, activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null, mediaRecorder = null, recordingChunks = [], recordingStartedAt = 0, recordingStopTimer = null, recordingTimer = null, recordingRequested = false, recordingCancelled = false, recordingPointerId = null, recordingStartX = 0, callPeer = null, callStream = null, callDialogId = null, callMuted = false, callSpeakerphone = false, pendingCall = null, callConfig = null, pendingIceCandidates = [], callTimeout = null, callToneContext = null, callToneTimer = null;
+    let token = null, username = '', avatar = '🙂', isAdmin = false, profile = { createdAt: '', messageCount: 0 }, socket = null, reconnectTimer = null, reconnectDelay = 1000, intentionallyClosed = false, authMode = 'login', users = [], dialogs = [], currentDialog = null, activePanel = 'chat', loadingHistory = false, selectedRow = null, editingMessageId = null, longPressTimer = null, typingTimer = null, unreadCount = 0, replyTo = null, mediaRecorder = null, recordingChunks = [], recordingStartedAt = 0, recordingStopTimer = null, recordingTimer = null, recordingRequested = false, recordingCancelled = false, recordingPointerId = null, recordingStartX = 0, callPeer = null, callStream = null, callDialogId = null, callMuted = false, callSpeakerphone = false, pendingCall = null, callConfig = null, pendingIceCandidates = [], callTimeout = null, callToneContext = null, callToneTimer = null;
     const typingUsers = new Set();
     const themes = { light: 'Графитовая', dark: 'Тёмная', night: 'Ночная' };
     function getTheme() { return localStorage.getItem('chatTheme') || 'light'; }
@@ -1043,6 +1049,7 @@
 
     function showChat() {
       document.getElementById('header-avatar').textContent = avatar;
+      document.getElementById('header-admin').classList.toggle('hidden', !isAdmin);
       loginScreen.classList.add('hidden'); chatScreen.style.display = 'flex';
       showContactPicker();
     }
@@ -1085,8 +1092,8 @@
         if (action === 'register' && body.password !== document.getElementById('confirm-password').value) throw new Error('Пароли не совпадают. Проверьте оба поля.');
         const response = await fetch(serverEndpoint('/' + action), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка авторизации');
-        token = data.token; username = data.login; avatar = data.avatar || '🙂'; intentionallyClosed = false;
-        localStorage.setItem('chatSession', JSON.stringify({ token, username, avatar })); showChat(); connectWebSocket();
+        token = data.token; username = data.login; avatar = data.avatar || '🙂'; isAdmin = data.isAdmin === true; intentionallyClosed = false;
+        localStorage.setItem('chatSession', JSON.stringify({ token, username, avatar, isAdmin })); showChat(); connectWebSocket();
       } catch (error) { authError.textContent = error.message; } finally { setAuthBusy(false); }
     }
     authForm.addEventListener('submit', (event) => { event.preventDefault(); authenticate(authMode); });
@@ -1225,18 +1232,39 @@
       const microphoneRow = createSettingRow('Микрофон', 'Проверяем разрешение…'); const microphoneButton = document.createElement('button'); microphoneButton.className = 'setting-button'; microphoneButton.type = 'button'; microphoneButton.textContent = 'Проверить'; microphoneButton.addEventListener('click', () => { if (microphoneButton.dataset.openSettings === 'true') { if (!openAndroidAppSettings()) showChatNotice('Откройте настройки Android и разрешите микрофон для приложения.'); return; } requestMicrophone(); }); microphoneRow.appendChild(microphoneButton); permissions.appendChild(microphoneRow); microphonePermission().then(({ state, text }) => { microphoneRow.querySelector('.setting-copy span').textContent = text; microphoneButton.textContent = state === 'granted' ? 'Разрешён' : state === 'denied' ? 'Открыть настройки' : 'Разрешить'; microphoneButton.disabled = state === 'unsupported'; microphoneButton.dataset.openSettings = String(state === 'denied'); }); const androidSettingsRow = createSettingRow('Настройки Android', 'Открыть системные разрешения приложения'); const androidSettingsButton = document.createElement('button'); androidSettingsButton.className = 'setting-button'; androidSettingsButton.type = 'button'; androidSettingsButton.textContent = 'Открыть'; androidSettingsButton.disabled = typeof window.KrugAndroid?.openAppSettings !== 'function'; androidSettingsButton.addEventListener('click', () => { if (!openAndroidAppSettings()) showChatNotice('Системные настройки доступны только в Android-приложении.'); }); androidSettingsRow.appendChild(androidSettingsButton); permissions.appendChild(androidSettingsRow); content.appendChild(permissions);
       const info = createSettingsSection('О приложении'); info.appendChild(createSettingRow('Круг', 'Личные сообщения, голосовые сообщения и аудиозвонки. Настройки хранятся только на этом устройстве.')); const androidRow = createSettingRow('Android-приложение', 'Скачайте последнюю версию APK для установки или обновления.'); const androidButton = document.createElement('a'); androidButton.className = 'setting-button'; androidButton.href = serverEndpoint('/download/krug-latest.apk'); androidButton.textContent = 'Скачать APK'; androidButton.setAttribute('download', 'krug-android-latest.apk'); const androidVersion = document.createElement('span'); androidVersion.className = 'release-version'; androidVersion.textContent = 'Проверяем версию…'; androidRow.append(androidButton, androidVersion); info.appendChild(androidRow); content.appendChild(info); fetch(serverEndpoint('/api/android-release')).then((response) => response.ok ? response.json() : null).then((release) => { if (release?.version) androidVersion.textContent = `Последняя версия ${release.version}`; else androidVersion.textContent = 'APK пока недоступен'; }).catch(() => { androidVersion.textContent = 'Версия недоступна'; });
     }
+    function formatAdminDate(timestamp) {
+      const date = new Date((timestamp || '').replace(' ', 'T') + (timestamp?.includes('Z') ? '' : 'Z'));
+      return Number.isNaN(date.getTime()) ? 'дата неизвестна' : date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    async function renderAdminPanel() {
+      const content = document.getElementById('panel-content'); content.replaceChildren();
+      const heading = document.createElement('p'); heading.style.cssText = 'margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.5'; heading.textContent = 'Только просмотр данных. Управление учётными записями и переписками здесь недоступно.'; content.appendChild(heading);
+      const summary = document.createElement('div'); summary.className = 'admin-summary'; const loading = document.createElement('p'); loading.textContent = 'Загружаем данные…'; content.append(summary, loading);
+      try {
+        const response = await fetch(serverEndpoint('/api/admin/overview'), { headers: { Authorization: `Bearer ${token}` } });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Не удалось загрузить данные панели.');
+        summary.replaceChildren();
+        [['Всего пользователей', data.totalUsers], ['Сейчас в сети', data.onlineUsers]].forEach(([label, value]) => { const metric = document.createElement('div'); metric.className = 'admin-metric'; const number = document.createElement('strong'); number.textContent = String(value); const caption = document.createElement('span'); caption.textContent = label; metric.append(number, caption); summary.appendChild(metric); });
+        loading.remove(); const section = createSettingsSection('Пользователи'); const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'setting-button admin-refresh'; refresh.textContent = 'Обновить'; refresh.addEventListener('click', renderAdminPanel); section.querySelector('h3').appendChild(refresh);
+        data.users.forEach((user) => { const row = document.createElement('div'); row.className = 'person'; const userAvatar = document.createElement('div'); userAvatar.className = 'avatar'; userAvatar.textContent = user.avatar || '🙂'; const copy = document.createElement('div'); copy.className = 'person-name'; const name = document.createElement('strong'); name.textContent = user.login; const meta = document.createElement('div'); meta.className = 'admin-user-meta'; meta.textContent = `Регистрация: ${formatAdminDate(user.createdAt)}`; copy.append(name, meta); const presence = document.createElement('div'); presence.className = 'presence' + (user.online ? ' online' : ''); const dot = document.createElement('i'); const label = document.createElement('span'); label.textContent = user.online ? 'в сети' : 'не в сети'; presence.append(dot, label); row.append(userAvatar, copy, presence); section.appendChild(row); }); content.appendChild(section);
+      } catch (error) { loading.textContent = error.message || 'Не удалось загрузить данные панели.'; }
+    }
     function showPanel(panel) {
       activePanel = panel;
       if (panel === 'chat') { closeDrawers(); return; }
-      const title = { profile: 'Мой профиль', settings: 'Настройки' }[panel];
+      if (panel === 'admin' && !isAdmin) return showChatNotice('Доступ к панели администратора запрещён.');
+      const title = { profile: 'Мой профиль', settings: 'Настройки', admin: 'Панель администратора' }[panel];
       document.getElementById('panel-title').textContent = title;
       const content = document.getElementById('panel-content'); content.replaceChildren();
       if (panel === 'profile') renderProfilePanel();
       if (panel === 'settings') renderSettingsPanel();
+      if (panel === 'admin') renderAdminPanel();
       document.getElementById('details-drawer').classList.add('open');
       document.querySelector('.chat').classList.add('page-open');
     }
     document.getElementById('header-settings').addEventListener('click', () => showPanel('settings'));
+    document.getElementById('header-admin').addEventListener('click', () => showPanel('admin'));
     document.getElementById('header-profile').addEventListener('click', () => showPanel('profile'));
     document.getElementById('chat-back').addEventListener('click', () => { clearSelection(); cancelReply(); showContactPicker(); });
     document.querySelector('.page-back').addEventListener('click', closeDrawers);
@@ -1490,7 +1518,7 @@
     document.getElementById('call-speaker').addEventListener('click', () => setCallSpeakerphone(!callSpeakerphone));
     document.getElementById('message-form').addEventListener('submit', (event) => { event.preventDefault(); const text = messageInput.value.trim(); if (!text) return; if (!currentDialog) return showChatNotice('Сначала выберите диалог.'); if (socket?.readyState !== WebSocket.OPEN) return showChatNotice('Нет подключения. Сообщение не отправлено.'); clearTimeout(typingTimer); socket.send(JSON.stringify({ type: 'typing_stop', dialogId: currentDialog.id })); socket.send(JSON.stringify(editingMessageId ? { type: 'edit_message', messageId: editingMessageId, dialogId: currentDialog.id, text } : { type: 'message', dialogId: currentDialog.id, text, replyToId: replyTo?.id || null })); editingMessageId = null; cancelReply(); messageInput.value = ''; messageInput.placeholder = 'Написать сообщение...'; messageInput.style.height = 'auto'; emojiPicker.classList.add('hidden'); messageInput.focus(); });
     if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));
-    try { const saved = JSON.parse(localStorage.getItem('chatSession')); if (saved?.token && saved?.username) { token = saved.token; username = saved.username; avatar = saved.avatar || '🙂'; showChat(); connectWebSocket(); } } catch (_) { localStorage.removeItem('chatSession'); }
+    try { const saved = JSON.parse(localStorage.getItem('chatSession')); if (saved?.token && saved?.username) { token = saved.token; username = saved.username; avatar = saved.avatar || '🙂'; isAdmin = saved.isAdmin === true; showChat(); connectWebSocket(); } } catch (_) { localStorage.removeItem('chatSession'); }
   </script>
 </body>
 </html>
